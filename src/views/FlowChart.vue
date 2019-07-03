@@ -1,14 +1,14 @@
 <template>
     <div class="flow-chart-container">
-        <SideBar />
         <Graph />
+        <SideBar />
     </div>
 </template>
 
 <script lang="ts">
 import { Component, Vue } from "vue-property-decorator";
-import SideBar from "@/components/SideBar.vue"; // @ is an alias to /src
-import Graph from "@/components/Graph.vue"; // @ is an alias to /src
+import SideBar from "@/components/SideBar.vue";
+import Graph from "@/components/Graph.vue";
 
 @Component({
     components: {
@@ -18,3 +18,13 @@ import Graph from "@/components/Graph.vue"; // @ is an alias to /src
 })
 export default class Home extends Vue {}
 </script>
+
+<style scoped lang="stylus">
+.flow-chart-container
+    display flex
+    align-items center
+    padding 40px 20px 40px
+    height 60vh
+    background-color #eee
+</style>
+
