@@ -1,8 +1,8 @@
 <template>
-    <div class="flow-chart-container">
-        <Graph />
-        <SideBar />
-    </div>
+  <div class="flow-chart-container">
+    <Graph />
+    <SideBar />
+  </div>
 </template>
 
 <script lang="ts">
@@ -11,10 +11,10 @@ import SideBar from "@/components/SideBar.vue";
 import Graph from "@/components/Graph.vue";
 
 @Component({
-    components: {
-        SideBar,
-        Graph
-    }
+  components: {
+    SideBar,
+    Graph
+  }
 })
 export default class Home extends Vue {}
 </script>
@@ -27,4 +27,3 @@ export default class Home extends Vue {}
     height 60vh
     background-color #eee
 </style>
-

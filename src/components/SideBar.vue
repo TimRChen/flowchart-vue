@@ -1,9 +1,9 @@
 <template>
-    <div class="side-bar-container">
-        <div class="list">
-            <Node v-for="(item, index) in list" :nodeItem="item" :key="index" />
-        </div>
+  <div class="side-bar-container">
+    <div class="list">
+      <Node v-for="(item, index) in list" :nodeItem="item" :key="index" />
     </div>
+  </div>
 </template>
 
 <script lang="ts">
@@ -11,36 +11,36 @@ import { Component, Prop, Vue } from "vue-property-decorator";
 import Node from "@/components/Node.vue";
 
 export interface NodeItem {
-    id: String;
-    title: String;
+  id: String;
+  title: String;
 }
 
 @Component({
-    components: { Node }
+  components: { Node }
 })
 export default class SideBar extends Vue {
-    private list: NodeItem[] = [
-        {
-            id: "1000000",
-            title: "新建"
-        },
-        {
-            id: "1000001",
-            title: "完成"
-        },
-        {
-            id: "2000000",
-            title: "待入库"
-        },
-        {
-            id: "2000001",
-            title: "已入库"
-        },
-        {
-            id: "2000000",
-            title: "入库中"
-        }
-    ];
+  private list: NodeItem[] = [
+    {
+      id: "1000000",
+      title: "新建"
+    },
+    {
+      id: "1000001",
+      title: "完成"
+    },
+    {
+      id: "2000000",
+      title: "待入库"
+    },
+    {
+      id: "2000001",
+      title: "已入库"
+    },
+    {
+      id: "2000000",
+      title: "入库中"
+    }
+  ];
 }
 </script>
 

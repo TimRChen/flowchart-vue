@@ -10,7 +10,7 @@ export default new Router({
       path: "/",
       name: "flowchart",
       component: FlowChart
-    },
+    }
     // {
     //   path: "/about",
     //   name: "about",
