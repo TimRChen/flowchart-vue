@@ -1,7 +1,7 @@
 <template>
   <div class="graph-container">
     <div
-      :class="['graph', { active: graphState.isDragging }]"
+      :class="['svg-box', { active: graphState.isDragging }]"
       @drop="addNode"
       @dragover.prevent
     >
@@ -17,7 +17,7 @@
         <defs>
           <marker
             id="mark-arrow"
-            viewBox="0 0 14 14"
+            viewBox="0 0 11 11"
             refX="8"
             refY="6"
             markerWidth="12"
@@ -26,18 +26,8 @@
           >
             <path d="M2,2 L10,6 L2,10 L6,6 L2,2" />
           </marker>
-          <!-- <marker
-            id="arrow"
-            viewBox="0 0 14 14"
-            refX="30"
-            refY="6"
-            markerWidth="12"
-            markerHeight="12"
-            orient="auto"
-          >
-            <path d="M2,2 L10,6 L2,10 L6,6 L2,2" />
-          </marker> -->
         </defs>
+
         <g class="graph">
           <path
             v-show="isLinking"
@@ -45,6 +35,7 @@
             :d="lineDragData"
             marker-end="url(#mark-arrow)"
           ></path>
+
           <g>
             <path
               v-for="edge in edges"
@@ -55,12 +46,12 @@
               @click="clickEdge(edge)"
             ></path>
           </g>
+
           <g>
             <g
               class="node-container"
               v-for="(node, index) in nodes"
               :key="index"
-              :draggable="draggable"
               :transform="'translate(' + node.x + ',' + node.y + ')'"
               @mousedown="nodeMousedown(node)"
             >
@@ -72,9 +63,8 @@
                 }"
                 :width="rectWidth"
                 :height="rectHeight"
-                x="0"
-                y="0"
               ></rect>
+
               <circle
                 cx="0"
                 cy="27"
@@ -85,6 +75,7 @@
                 @mousedown="linkNode('left', $event)"
                 @mouseup="linkedNode('left', node)"
               />
+
               <circle
                 cx="130"
                 cy="27"
@@ -95,9 +86,11 @@
                 @mousedown="linkNode('right', $event)"
                 @mouseup="linkedNode('right', node)"
               />
-              <text x="50" y="20">
+
+              <text x="45" y="20">
                 <tspan>{{ node.title }}</tspan>
               </text>
+
               <text x="35" y="40">
                 <tspan>{{ node.id }}</tspan>
               </text>
@@ -146,7 +139,6 @@ export default class Graph extends Vue {
   private edges: EdgeClass[] = [];
   private rectWidth: String = "130px";
   private rectHeight: String = "50px";
-  private draggable: Boolean = true;
   private isLinking: Boolean = false;
   private nodeCanDrag: Boolean = true;
   private lineDragData: String = "";
@@ -157,6 +149,7 @@ export default class Graph extends Vue {
   @Action("changSelectedNode") changSelectedNode!: Function;
   @Action("changSelectedEdge") changSelectedEdge!: Function;
   @Action("toggle_toLink") toggleToLink!: Function;
+  @Action("toggle_isDragging") toggleIsDragging!: Function;
 
   /**
    * 新增节点
@@ -184,32 +177,7 @@ export default class Graph extends Vue {
       }
     };
     this.nodes.push(node);
-  }
-
-  /**
-   * 解除节点选中状态
-   */
-  unSelectedNodes() {
-    this.nodes.map(function(node: NodeClass) {
-      node.selected = false;
-    });
-  }
-
-  /**
-   * 解除节点连线选中状态
-   */
-  unSelectedEdges() {
-    this.edges.map(function(edge: EdgeClass) {
-      edge.selected = false;
-    });
-  }
-
-  /**
-   * 解除全部选中
-   */
-  unSelectedAll() {
-    this.unSelectedNodes();
-    this.unSelectedEdges();
+    this.toggleIsDragging(false);
   }
 
   /**
@@ -256,16 +224,6 @@ export default class Graph extends Vue {
     }
   }
 
-  /**
-   * 点击路径
-   * @argument edge - 路径元数据
-   */
-  clickEdge(edge: EdgeClass) {
-    this.unSelectedAll();
-    edge.selected = true;
-    this.changSelectedEdge(edge);
-  }
-
   nodeMousedown(node: NodeClass) {
     this.unSelectedAll();
     node.selected = true;
@@ -275,6 +233,17 @@ export default class Graph extends Vue {
       this.isLinking = true;
       this.nodeCanDrag = false;
     }
+  }
+
+  /**
+   * 开始连接节点
+   * @description 连线起始函数
+   * @argument position - 连线起点位置
+   * @argument node - 起始节点
+   */
+  linkNode(position: string, event: any) {
+    this.toggleToLink(true);
+    this.dotLink = position;
   }
 
   /**
@@ -308,17 +277,6 @@ export default class Graph extends Vue {
   }
 
   /**
-   * 开始连接节点
-   * @description 连线起始函数
-   * @argument position - 连线起点位置
-   * @argument node - 起始节点
-   */
-  linkNode(position: string, event: any) {
-    this.toggleToLink(true);
-    this.dotLink = position;
-  }
-
-  /**
    * 动态计算路径拖拽数据
    */
   caclPathDragData(mousedownNode: NodeClass, event: any) {
@@ -327,6 +285,8 @@ export default class Graph extends Vue {
 
     let startX = 0;
     let startY = 0;
+    let endX = 0;
+    let endY = 0;
 
     if (this.dotLink === "left") {
       startX = linkNode.left.x;
@@ -336,7 +296,13 @@ export default class Graph extends Vue {
       startY = linkNode.right.y;
     }
 
-    return `M ${startX},${startY} L ${x},${y}`;
+    const arrowDx = 20;
+    const arrowDy = 10;
+
+    endX = x - arrowDx;
+    endY = y - rectHeight / 2 - arrowDy;
+
+    return `M ${startX},${startY} L ${endX},${endY}`;
   }
 
   /**
@@ -403,6 +369,42 @@ export default class Graph extends Vue {
     event.preventDefault();
     return false;
   }
+
+  /**
+   * 点击路径
+   * @argument edge - 路径元数据
+   */
+  clickEdge(edge: EdgeClass) {
+    this.unSelectedAll();
+    edge.selected = true;
+    this.changSelectedEdge(edge);
+  }
+
+  /**
+   * 解除节点选中状态
+   */
+  unSelectedNodes() {
+    this.nodes.map(function(node: NodeClass) {
+      node.selected = false;
+    });
+  }
+
+  /**
+   * 解除节点连线选中状态
+   */
+  unSelectedEdges() {
+    this.edges.map(function(edge: EdgeClass) {
+      edge.selected = false;
+    });
+  }
+
+  /**
+   * 解除全部选中
+   */
+  unSelectedAll() {
+    this.unSelectedNodes();
+    this.unSelectedEdges();
+  }
 }
 </script>
 
@@ -410,10 +412,20 @@ export default class Graph extends Vue {
 .graph-container {
     flex: 1;
     height: 100%;
-    background: #FFFFFF;
     border: 1px solid #DCDCDC;
-    margin-right: 7px;
+    overflow: hidden;
+    background: #FFFFFF;
     box-shadow: 0 2px 4px 0 #B3C0D8;
+    margin-right: 7px;
+
+    .svg-box {
+      background: #fff;
+      transition: background .2s ease-in-out;
+    }
+
+    .active {
+      background: #eee;
+    }
 
     .zone {
         .graph {
@@ -421,10 +433,11 @@ export default class Graph extends Vue {
                 fill: none;
                 stroke: #000;
                 stroke-width: 2px;
+            }
 
-                // &:hover {
-                //     stroke-width: 4px;
-                // }
+            path.dragline {
+              stroke: #888;
+              stroke-dasharray: 8px;
             }
 
             path.selected {
@@ -451,17 +464,21 @@ export default class Graph extends Vue {
                 }
 
                 .link-dot {
-                    r: 5px;
-                    fill: red;
+                    r: 2px;
+                    fill: transparent;
+                    stroke: #000;
+                    stroke-width: 2px;
                     transition: all 0.2s ease-in-out;
 
                     &:hover {
                         r: 10px;
+                        stroke: red;
                     }
                 }
 
                 .active-dot {
                     r: 10px;
+                    stroke: red;
                 }
 
                 text {
