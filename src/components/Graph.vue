@@ -103,7 +103,7 @@
 </template>
 
 <script lang="ts">
-import { Component, Prop, Vue } from "vue-property-decorator";
+import { Component, Prop, Watch, Vue } from "vue-property-decorator";
 import { Getter, Action } from "vuex-class";
 import Node from "./Node.vue";
 
@@ -115,7 +115,7 @@ const rectHeight = 55;
 const svgDx = rectWidth * 2;
 const svgDy = rectHeight * 2;
 
-interface NodeClass {
+export interface NodeClass {
   id: string;
   title: string;
   x: number;
@@ -124,7 +124,7 @@ interface NodeClass {
   linkNode: any;
 }
 
-interface EdgeClass {
+export interface EdgeClass {
   id: number;
   source: NodeClass | null;
   target: NodeClass | null;
@@ -135,6 +135,7 @@ interface EdgeClass {
 
 @Component
 export default class Graph extends Vue {
+  @Prop() private exportStatus!: Boolean;
   private nodes: NodeClass[] = [];
   private edges: EdgeClass[] = [];
   private rectWidth: String = "130px";
@@ -150,6 +151,28 @@ export default class Graph extends Vue {
   @Action("changSelectedEdge") changSelectedEdge!: Function;
   @Action("toggle_toLink") toggleToLink!: Function;
   @Action("toggle_isDragging") toggleIsDragging!: Function;
+
+  @Watch("exportStatus")
+  onExportStatusChanged(value: boolean) {
+    if (value) {
+      this.exportSvgToJSON();
+    }
+  }
+
+  /**
+   * 导出svg json数据
+   */
+  exportSvgToJSON() {
+    const { nodes, edges } = this;
+    if (nodes.length === 0 || edges.length === 0) {
+      alert("流程配置未给出，无法导出数据");
+      this.$emit("update:exportStatus", false);
+      return false;
+    }
+    const json = { nodes, edges };
+    this.$emit("update:exportStatus", false);
+    this.$emit("export-json", json);
+  }
 
   /**
    * 新增节点
