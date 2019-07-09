@@ -40,7 +40,7 @@
             <path
               v-for="edge in edges"
               :key="edge.id"
-              :class="['link', { selected: edge.selected }]"
+              :class="['link', 'link-active', { selected: edge.selected }]"
               :d="edgeData(edge)"
               marker-end="url(#mark-arrow)"
               @click="clickEdge(edge)"
@@ -464,7 +464,8 @@ export default class Graph extends Vue {
             }
 
             path.selected {
-                stroke: #9b78d3;
+                stroke: #000;
+                stroke-dasharray: 8px;
             }
 
             g.node-container {

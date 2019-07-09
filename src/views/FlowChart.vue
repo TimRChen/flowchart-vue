@@ -10,7 +10,6 @@
     <GraphShow :jsonData="jsonData" />
     <div class="control">
       <div class="export-btn btn" @click="exportJSON">导出JSON</div>
-      <div class="import-btn btn">引入JSON</div>
     </div>
   </div>
 </template>
@@ -70,7 +69,6 @@ export default class FlowChart extends Vue {
 
         .btn {
             padding: 10px 20px;
-            margin-right: 10px;
             text-align: center;
             font-size: 20px;
             background-color: #fff;
