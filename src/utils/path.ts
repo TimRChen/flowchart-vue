@@ -8,7 +8,12 @@ const rectHeight = 70;
  * @argument {String} endX 终点XAxis
  * @argument {String} endY 终点YAxis
  */
-export function getMidXPath(startX: number, startY: number, endX: number, endY: number) {
+export function getMidXPath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number
+) {
   const midX1 = (startX + endX) / 2;
   const midY1 = startY;
   const midX2 = midX1;
@@ -28,7 +33,12 @@ export function getMidXPath(startX: number, startY: number, endX: number, endY: 
  * @argument {String} endX 终点XAxis
  * @argument {String} endY 终点YAxis
  */
-function getMidYPath(startX: number, startY: number, endX: number, endY: number) {
+function getMidYPath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number
+) {
   const midX1 = startX;
   const midY1 = (startY + endY) / 2;
   const midX2 = endX;
@@ -48,7 +58,12 @@ function getMidYPath(startX: number, startY: number, endX: number, endY: number)
  * @argument {String} endX 终点XAxis
  * @argument {String} endY 终点YAxis
  */
-function getLLMidPath(startX: number, startY: number, endX: number, endY: number) {
+function getLLMidPath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number
+) {
   let dX = Math.abs(startX - endX) * 2;
   if (dX === 0 || dX < rectWidth * 2) {
     dX = 88;
@@ -74,7 +89,12 @@ function getLLMidPath(startX: number, startY: number, endX: number, endY: number
  * @argument {String} endX 终点XAxis
  * @argument {String} endY 终点YAxis
  */
-function getRRMidPath(startX: number, startY: number, endX: number, endY: number) {
+function getRRMidPath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number
+) {
   let dX = Math.abs(startX - endX) * 2;
   if (dX === 0 || dX < rectWidth * 2) {
     dX = 88;
@@ -100,7 +120,12 @@ function getRRMidPath(startX: number, startY: number, endX: number, endY: number
  * @argument {String} endX 终点XAxis
  * @argument {String} endY 终点YAxis
  */
-function getRToLNotStraightLinePath(startX: number, startY: number, endX: number, endY: number) {
+function getRToLNotStraightLinePath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number
+) {
   const dotX1 = startX + rectWidth / 4;
   const dotY2 = (startY + endY) / 2;
   const dotX3 = endX - rectWidth / 4;
@@ -120,7 +145,12 @@ function getRToLNotStraightLinePath(startX: number, startY: number, endX: number
  * 获取左端向右端且非直线连接线段（输出四个点坐标）
  * @argument linkData - 连线数据
  */
-function getLToRNotStraightLine(startX: number, startY: number, endX: number, endY: number) {
+function getLToRNotStraightLine(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number
+) {
   const dotX1 = startX - rectWidth / 4;
   const dotY2 = (startY + endY) / 2;
   const dotX3 = endX + rectWidth / 4;
@@ -140,22 +170,12 @@ function getLToRNotStraightLine(startX: number, startY: number, endX: number, en
  * 同侧端点连接： L-L || R-R
  */
 export function handleTheSameLinkDot(linkData: any) {
-  const { dotLink, dotEndLink, startX, startY, endX, endY } = linkData
+  const { dotLink, dotEndLink, startX, startY, endX, endY } = linkData;
   if (dotLink === "left" && dotEndLink === "left") {
-    const { midX, midY1, midY2 } = getLLMidPath(
-      startX,
-      startY,
-      endX,
-      endY
-    );
+    const { midX, midY1, midY2 } = getLLMidPath(startX, startY, endX, endY);
     return `M ${startX},${startY} L ${midX},${midY1} L ${midX},${midY2} L ${endX},${endY}`;
   } else if (dotLink === "right" && dotEndLink === "right") {
-    const { midX, midY1, midY2 } = getRRMidPath(
-      startX,
-      startY,
-      endX,
-      endY
-    );
+    const { midX, midY1, midY2 } = getRRMidPath(startX, startY, endX, endY);
     return `M ${startX},${startY} L ${midX},${midY1} L ${midX},${midY2} L ${endX},${endY}`;
   }
   return "";
@@ -166,7 +186,7 @@ export function handleTheSameLinkDot(linkData: any) {
  * @argument linkData - 连线数据
  */
 export function handelNotSameLinkDotAndNotStraightLine(linkData: any) {
-  const { dotLink, dotEndLink, startX, startY, endX, endY } = linkData
+  const { dotLink, dotEndLink, startX, startY, endX, endY } = linkData;
   if (dotLink === "left" && dotEndLink === "right") {
     if (startX < endX) {
       if (startX + rectWidth * 2 < endX) {

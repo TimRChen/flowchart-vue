@@ -21,7 +21,7 @@
 
     <div class="status-content" v-show="showList">
       <div class="list">
-        <Node v-for="(item, index) in list" :nodeItem="item" :key="index" />
+        <Node v-for="(item, index) in list" :node-item="item" :key="index" />
       </div>
     </div>
 
@@ -142,12 +142,14 @@ export default class SideBar extends Vue {
   }
 
   handleTypeChanged(type: string) {
-    this.nodesInfo.forEach((node: any): any => {
-      if (node.id === this.settingNodeId) {
-        node.type = type === "real" ? 1 : 2;
+    this.nodesInfo.forEach(
+      (node: any): any => {
+        if (node.id === this.settingNodeId) {
+          node.type = type === "real" ? 1 : 2;
+        }
+        return node;
       }
-      return node;
-    });
+    );
   }
 
   chooseNodeType(type: string) {

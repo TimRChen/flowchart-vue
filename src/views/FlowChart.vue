@@ -2,24 +2,24 @@
   <div class="flow-chart-container">
     <div class="flow-chart-config">
       <Graph
-        :importJsonData="importJsonData"
-        :nodeType="nodeType"
-        :saveStatus.sync="saveStatus"
-        :deleteNode.sync="deleteNode"
+        :import-json-data="importJsonData"
+        :node-type="nodeType"
+        :save-status.sync="saveStatus"
+        :delete-node.sync="deleteNode"
         @export-json="handleExportJSON"
         @setting-node="handleNodeSetting"
         @recovery-side-bar="handleRecoverySideBar"
       />
       <SideBar
-        :importJsonData="importJsonData"
-        :nodeType.sync="nodeType"
-        :saveStatus.sync="saveStatus"
-        :settingNodeId="settingNodeId"
+        :import-json-data="importJsonData"
+        :node-type.sync="nodeType"
+        :save-status.sync="saveStatus"
+        :setting-node-id="settingNodeId"
         @export-json="handleExportJSON"
         @delete-node="handleDeleteNode"
       />
     </div>
-    <GraphShow :jsonData="jsonData" />
+    <GraphShow :json-data="jsonData" />
     <div class="control">
       <div class="export-btn btn" @click="exportJSON">导出JSON</div>
     </div>
@@ -70,7 +70,7 @@ export default class FlowChart extends Vue {
       edges.length > 0
       // && nodesInfo.length > 0
     ) {
-      // ..
+      // some callback..
     }
   }
 
