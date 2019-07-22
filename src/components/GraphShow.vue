@@ -1,22 +1,41 @@
 <template>
   <div class="graph-show-container">
+    <div
+      class="tip-block"
+      :class="{ 'tip-close': closeTip }"
+      v-show="showTip !== 0"
+      :style="{ transform: 'translate(' + tipX + 'px,' + tipY + 'px)' }"
+    >
+      <div class="title">节点参数</div>
+      <div class="attr-block">
+        <div class="attr">
+          <div class="head">节点信息</div>
+          <div class="content">无</div>
+        </div>
+      </div>
+    </div>
+
     <div class="svg-box" v-show="svgReady">
-      <svg class="zone" width="100%" height="818">
+      <svg
+        class="zone"
+        preserveAspectRatio="xMinYMin meet"
+        @mouseup="closeNodeInfoTip"
+      >
         <defs>
           <marker
             id="mark-arrow"
             viewBox="0 0 11 11"
             refX="8"
             refY="6"
-            markerWidth="12"
-            markerHeight="12"
+            markerWidth="10"
+            markerHeight="10"
             orient="auto"
           >
-            <path d="M2,2 L10,6 L2,10 L6,6 L2,2" />
+            <path d="M1,2 L8,6 L1,10 Z" />
           </marker>
         </defs>
 
-        <g class="graph">
+        <g class="graph" x="0" y="0">
           <g>
             <path
               v-for="edge in edges"
@@ -33,27 +52,50 @@
               v-for="(node, index) in nodes"
               :key="index"
               :transform="'translate(' + node.x + ',' + node.y + ')'"
+              @mousedown="showNodeInfoTip($event, node.id)"
             >
-              <rect class="node" :width="rectWidth" :height="rectHeight"></rect>
+              <rect
+                class="node"
+                :class="{
+                  active: showTip === node.id,
+                  virtual: node.type === 'virtual'
+                }"
+                :width="rectWidth"
+                :height="rectHeight"
+                rx="2"
+                ry="2"
+              ></rect>
 
-              <circle cx="0" cy="27" class="link-dot" />
+              <circle cx="0" cy="35" class="link-dot" />
 
-              <circle cx="130" cy="27" class="link-dot" />
+              <circle cx="141" cy="35" class="link-dot" />
 
-              <text x="45" y="20">
-                <tspan>{{ node.title }}</tspan>
-              </text>
+              <svg :width="rectWidth" :height="rectHeight">
+                <text
+                  x="50%"
+                  y="45%"
+                  alignment-baseline="middle"
+                  text-anchor="middle"
+                >
+                  <tspan>{{ node.id }}</tspan>
+                </text>
 
-              <text x="35" y="40">
-                <tspan>{{ node.id }}</tspan>
-              </text>
+                <text
+                  x="50%"
+                  y="75%"
+                  alignment-baseline="middle"
+                  text-anchor="middle"
+                >
+                  <tspan>{{ node.title }}</tspan>
+                </text>
+              </svg>
             </g>
           </g>
         </g>
       </svg>
     </div>
     <div class="nothing-showing" v-show="!svgReady">
-      没有可展示的输出JSON数据.
+      当前暂未配置任何流程
     </div>
   </div>
 </template>
@@ -62,21 +104,36 @@
 import { Component, Prop, Watch, Vue } from "vue-property-decorator";
 import { NodeClass, EdgeClass } from "@/components/Graph.vue";
 import { SvgJsonClass } from "@/views/FlowChart.vue";
+import {
+  handleTheSameLinkDot,
+  handelNotSameLinkDotAndNotStraightLine,
+  getMidXPath
+} from "@/utils/path.ts";
+
+const rectWidth = 141;
+const rectHeight = 70;
+let timer: number | null = null;
 
 @Component
 export default class GraphShow extends Vue {
   @Prop() private jsonData!: SvgJsonClass;
   private edges: EdgeClass[] = [];
   private nodes: NodeClass[] = [];
-  private rectWidth: String = "130px";
-  private rectHeight: String = "50px";
+  private nodesInfo!: Array<object>;
+  private rectWidth: string = "141px";
+  private rectHeight: string = "70px";
+  private showTip: number = 0;
+  private closeTip: boolean = false;
+  private tipX: number = 0;
+  private tipY: number = 0;
 
-  @Watch("jsonData")
+  @Watch("jsonData", { deep: true })
   onJsonDataChanged(value: SvgJsonClass) {
-    const { nodes, edges } = value;
+    const { nodes, edges, nodesInfo } = value;
     if (nodes.length > 0 && edges.length > 0) {
       this.edges = edges;
       this.nodes = nodes;
+      this.nodesInfo = nodesInfo;
     }
   }
 
@@ -94,14 +151,15 @@ export default class GraphShow extends Vue {
   edgeData(edge: EdgeClass) {
     const { dotLink, dotEndLink } = edge;
     if (edge.source && edge.target) {
-      const bezier = 100;
-      const { linkNode: sourceLinkNode } = edge.source;
-      const { linkNode: targetLinkNode } = edge.target;
+      const { linkNode: sourceLinkNode, y: sourceNodeY }: any = this.nodes.find(
+        i => i.id === edge.source
+      );
+      const { linkNode: targetLinkNode }: any = this.nodes.find(
+        i => i.id === edge.target
+      );
 
       let startX = 0;
       let startY = 0;
-      let midX = 0;
-      let midY = 0;
       let endX = 0;
       let endY = 0;
 
@@ -121,13 +179,73 @@ export default class GraphShow extends Vue {
         endY = targetLinkNode.right.y;
       }
 
-      // midX = (startX + endX) / 2;
-      // midY = (startY + endX) / 2 - bezier;
+      const linkData = {
+        dotLink,
+        dotEndLink,
+        startX,
+        startY,
+        endX,
+        endY
+      };
 
-      // return `M ${startX},${startY} Q ${midX},${midY} ${endX},${endY}`;
-      return `M ${startX},${startY} L ${endX},${endY}`;
-    } else {
-      return false;
+      // 连接端点同侧
+      const sameLinkDotResult = handleTheSameLinkDot(linkData);
+
+      if (sameLinkDotResult !== "") {
+        return sameLinkDotResult;
+      }
+
+      // 连接端点不同侧且不为顺向连接直线的
+      const NotSameLinkDotAndNSLResult = handelNotSameLinkDotAndNotStraightLine(
+        linkData
+      );
+
+      if (NotSameLinkDotAndNSLResult !== "") {
+        return NotSameLinkDotAndNSLResult;
+      }
+
+      // 纵坐标最小连线误差直线拟合
+      const minY = Math.abs(startY - endY);
+      const rangeNum = 3;
+      if (minY < rangeNum) {
+        endY = startY;
+        this.nodes.forEach(i => {
+          if (i.id === edge.target) {
+            i.y = sourceNodeY;
+            return i;
+          }
+        });
+      }
+
+      // 正常情况连接
+      const { midX1, midY1, midX2, midY2 } = getMidXPath(
+        startX,
+        startY,
+        endX,
+        endY
+      );
+      return `M ${startX},${startY} L ${midX1},${midY1} L ${midX2},${midY2} L ${endX},${endY}`;
+    }
+    return false;
+  }
+
+  showNodeInfoTip(event: MouseEvent, nodeId: number) {
+    const { layerX, layerY } = event;
+    this.tipX = layerX;
+    this.tipY = layerY;
+    this.showTip = nodeId;
+  }
+
+  closeNodeInfoTip() {
+    if (this.showTip !== 0) {
+      this.closeTip = true;
+      if (timer === null) {
+        timer = setTimeout(() => {
+          this.showTip = 0;
+          this.closeTip = false;
+          timer = null;
+        }, 188);
+      }
     }
   }
 }
@@ -136,62 +254,126 @@ export default class GraphShow extends Vue {
 <style lang="stylus" scoped>
 .graph-show-container {
     height: 100%;
-    border: 1px solid #DCDCDC;
     overflow: hidden;
-    background: #FFFFFF;
-    box-shadow: 0 2px 4px 0 #B3C0D8;
+    background: #ffffff;
     margin: 20px 0;
+    position: relative;
 
-    .svg-box {
-        background: #fff;
-        transition: background 0.2s ease-in-out;
-    }
+    div.tip-block {
+        position: absolute;
+        width: 250px;
+        height: 300px;
+        background: #ffffff;
+        border: 1px solid #dcdcdc;
+        box-shadow: 0 2px 4px 0 #b3c0d8;
+        overflow: scroll;
+        animation: fadeIn 0.2s ease-in-out;
 
-    .active {
-        background: #eee;
-    }
+        .title {
+            font-size: 12px;
+            color: #4a4a4a;
+            font-weight: bold;
+            padding: 8px;
+            border-bottom: 1px solid #eee;
+        }
 
-    .zone {
-        .graph {
-            path.link {
-                fill: none;
-                stroke: #000;
-                stroke-width: 2px;
-            }
+        .attr-block {
+            margin: 8px;
 
-            path.dragline {
-                stroke: #888;
-                stroke-dasharray: 8px;
-            }
-
-            path.selected {
-                stroke: #9b78d3;
-            }
-
-            g.node-container {
-                user-select: none;
-
-                .node {
-                    fill: transparent;
-                    stroke-width: 2px;
-                    stroke: #000;
-                    transition: all 0.2s ease-in-out;
-                }
-
-                .link-dot {
-                    r: 0px;
-                    fill: transparent;
-                    stroke: #000;
-                    stroke-width: 2px;
-                    transition: all 0.2s ease-in-out;
-                }
-
-                text {
-                    font-size: 14px;
-                    color: #4a4a4a;
+            .attr {
+                .head {
+                    font-size: 12px;
+                    color: #4a90e2;
+                    font-weight: bold;
                 }
             }
         }
+    }
+
+    .tip-close {
+        animation: fadeOut 0.2s ease-in-out;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+
+        to {
+            opacity: 1;
+        }
+    }
+
+    @keyframes fadeOut {
+        from {
+            opacity: 1;
+        }
+
+        to {
+            opacity: 0;
+        }
+    }
+
+    div.svg-box {
+        background: #fff;
+        transition: background 0.2s ease-in-out;
+        box-shadow: 0 2px 4px 0 #b3c0d8;
+        border: 1px solid #dcdcdc;
+        overflow: scroll;
+
+        svg.zone {
+            width: 5000px;
+            height: 818px;
+
+            .graph {
+                path.link {
+                    fill: none;
+                    stroke: #000;
+                    stroke-width: 2px;
+                }
+
+                path.dragline {
+                    stroke: #888;
+                    stroke-dasharray: 8px;
+                }
+
+                path.selected {
+                    stroke: #9b78d3;
+                }
+
+                g.node-container {
+                    user-select: none;
+                    cursor: pointer;
+
+                    .node {
+                        fill: transparent;
+                        stroke-width: 2px;
+                        stroke: #4a4a4a;
+                        transition: all 0.2s ease-in-out;
+                    }
+
+                    .virtual {
+                        stroke-dasharray: 2px;
+                    }
+
+                    .active {
+                        fill: #eee;
+                    }
+
+                    text {
+                        user-select: none;
+                        font-size: 14px;
+                        fill: #4a4a4a;
+                    }
+                }
+            }
+        }
+    }
+
+    .nothing-showing {
+        font-size: 30px;
+        color: #9b9b9b;
+        text-align: center;
     }
 }
 </style>

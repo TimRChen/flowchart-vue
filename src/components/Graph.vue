@@ -1,18 +1,11 @@
 <template>
   <div class="graph-container">
-    <div
-      :class="['svg-box', { active: graphState.isDragging }]"
-      @drop="addNode"
-      @dragover.prevent
-    >
+    <div class="svg-box" @drop="createNode" @dragover.prevent>
       <svg
         class="zone"
-        width="100%"
-        height="818"
+        :class="{ active: graphState.isDragging }"
         @mousemove="svgMousemove($event)"
         @mouseup="svgMouseUp"
-        @mousedown.right="svgMouseRightDown"
-        @contextmenu="rightMenu($event)"
       >
         <defs>
           <marker
@@ -20,11 +13,11 @@
             viewBox="0 0 11 11"
             refX="8"
             refY="6"
-            markerWidth="12"
-            markerHeight="12"
+            markerWidth="10"
+            markerHeight="10"
             orient="auto"
           >
-            <path d="M2,2 L10,6 L2,10 L6,6 L2,2" />
+            <path d="M1,2 L8,6 L1,10 Z" />
           </marker>
         </defs>
 
@@ -53,47 +46,58 @@
               v-for="(node, index) in nodes"
               :key="index"
               :transform="'translate(' + node.x + ',' + node.y + ')'"
-              @mousedown="nodeMousedown(node)"
+              @mousedown="dragNode(node)"
+              @contextmenu="rightMenu($event, node)"
             >
               <rect
                 class="node"
-                :class="{
-                  selected: node.selected,
-                  'to-link': graphState.toLink
-                }"
+                :class="rectClass(node)"
                 :width="rectWidth"
                 :height="rectHeight"
+                rx="2"
+                ry="2"
               ></rect>
 
               <circle
                 cx="0"
-                cy="27"
+                cy="35"
                 class="link-dot"
                 :class="{
                   'active-dot': dotLink === 'left' && node === mousedownNode
                 }"
-                @mousedown="linkNode('left', $event)"
-                @mouseup="linkedNode('left', node)"
+                @mousedown="startLinkNode('left')"
+                @mouseup="endLinkedNode('left', node)"
               />
 
               <circle
-                cx="130"
-                cy="27"
+                cx="141"
+                cy="35"
                 class="link-dot"
                 :class="{
                   'active-dot': dotLink === 'right' && node === mousedownNode
                 }"
-                @mousedown="linkNode('right', $event)"
-                @mouseup="linkedNode('right', node)"
+                @mousedown="startLinkNode('right')"
+                @mouseup="endLinkedNode('right', node)"
               />
+              <svg :width="rectWidth" :height="rectHeight">
+                <text
+                  x="50%"
+                  y="45%"
+                  alignment-baseline="middle"
+                  text-anchor="middle"
+                >
+                  <tspan>{{ node.id }}</tspan>
+                </text>
 
-              <text x="45" y="20">
-                <tspan>{{ node.title }}</tspan>
-              </text>
-
-              <text x="35" y="40">
-                <tspan>{{ node.id }}</tspan>
-              </text>
+                <text
+                  x="50%"
+                  y="75%"
+                  alignment-baseline="middle"
+                  text-anchor="middle"
+                >
+                  <tspan>{{ node.title }}</tspan>
+                </text>
+              </svg>
             </g>
           </g>
         </g>
@@ -106,18 +110,21 @@
 import { Component, Prop, Watch, Vue } from "vue-property-decorator";
 import { Getter, Action } from "vuex-class";
 import Node from "./Node.vue";
+import {
+  handleTheSameLinkDot,
+  handelNotSameLinkDotAndNotStraightLine,
+  getMidXPath
+} from "@/utils/path.ts";
 
-let edgeId = 2;
+let edgeId = 1;
 
-const rectWidth = 130;
-const rectHeight = 55;
-// rect上下左右偏移量
-const svgDx = rectWidth * 2;
-const svgDy = rectHeight * 2;
+const rectWidth = 141;
+const rectHeight = 70;
 
 export interface NodeClass {
-  id: string;
+  id: number;
   title: string;
+  type: string;
   x: number;
   y: number;
   selected: boolean;
@@ -126,25 +133,31 @@ export interface NodeClass {
 
 export interface EdgeClass {
   id: number;
-  source: NodeClass | null;
-  target: NodeClass | null;
+  source: number | null;
+  target: number | null;
   selected: boolean;
-  dotLink: String;
-  dotEndLink: String;
+  dotLink: string;
+  dotEndLink: string;
 }
 
 @Component
 export default class Graph extends Vue {
-  @Prop() private exportStatus!: Boolean;
+  @Prop() private saveStatus!: boolean;
+  @Prop() private deleteNode!: boolean;
+  @Prop() private nodeType!: string;
+  @Prop() private importJsonData!: object;
+
   private nodes: NodeClass[] = [];
   private edges: EdgeClass[] = [];
-  private rectWidth: String = "130px";
-  private rectHeight: String = "50px";
-  private isLinking: Boolean = false;
-  private nodeCanDrag: Boolean = true;
-  private lineDragData: String = "";
+  private rectWidth: string = "141px";
+  private rectHeight: string = "70px";
+  private isLinking: boolean = false;
+  private nodeCanDrag: boolean = true;
+  private lineDragData: string = "";
   private mousedownNode: NodeClass | null = null;
-  private dotLink: String = "";
+  private dotLink: string = "";
+  private settingNodeId: number = 0;
+  private createNodeLock: boolean = false;
 
   @Getter("graphState") graphState!: any;
   @Action("changSelectedNode") changSelectedNode!: Function;
@@ -152,55 +165,131 @@ export default class Graph extends Vue {
   @Action("toggle_toLink") toggleToLink!: Function;
   @Action("toggle_isDragging") toggleIsDragging!: Function;
 
-  @Watch("exportStatus")
+  @Watch("saveStatus")
   onExportStatusChanged(value: boolean) {
     if (value) {
-      this.exportSvgToJSON();
+      this.saveJsonData();
     }
+  }
+  @Watch("deleteNode")
+  onDeleteNodeChanged(value: boolean) {
+    if (value) {
+      this.handleDeleteNode();
+    }
+  }
+  @Watch("nodeType")
+  onNodeTypeChanged(type: string) {
+    this.nodes.forEach(node => {
+      if (node.id === this.settingNodeId) {
+        node.type = type;
+      }
+    });
+  }
+  @Watch("importJsonData", { deep: true })
+  onImportJsonDataChanged(obj: object) {
+    const { nodes, edges } = JSON.parse(JSON.stringify(obj));
+    this.nodes = nodes;
+    this.edges = edges;
+  }
+
+  rectClass(node: NodeClass) {
+    return {
+      selected: node.selected,
+      "to-link": this.graphState.toLink,
+      setting: this.settingNodeId === node.id,
+      virtual: node.type === "virtual"
+    };
   }
 
   /**
    * 导出svg json数据
    */
-  exportSvgToJSON() {
+  saveJsonData() {
     const { nodes, edges } = this;
     if (nodes.length === 0 || edges.length === 0) {
       alert("流程配置未给出，无法导出数据");
-      this.$emit("update:exportStatus", false);
+      this.$emit("update:saveStatus", false);
       return false;
     }
     const json = { nodes, edges };
-    this.$emit("update:exportStatus", false);
     this.$emit("export-json", json);
   }
 
   /**
-   * 新增节点
-   * @description 向SVG画布中新增节点
+   * 删除svg node edge 数据
    */
-  addNode(event: any) {
-    var jsonStr = event.dataTransfer.getData("item");
-    var jsonObj = JSON.parse(jsonStr);
-    const { id, title } = jsonObj;
-    const node = {
-      id,
-      title,
-      x: event.x - rectWidth,
-      y: event.y - rectHeight,
-      selected: false,
-      linkNode: {
-        left: {
-          x: event.x - rectWidth,
-          y: event.y - rectHeight + rectHeight / 2
-        },
-        right: {
-          x: event.x - rectWidth + rectWidth,
-          y: event.y - rectHeight + rectHeight / 2
+  handleDeleteNode() {
+    const index = this.nodes.findIndex(node => node.id === this.settingNodeId);
+    if (index !== -1) {
+      this.nodes.splice(index, 1);
+      this.edges = this.edges.filter(edge => {
+        if (
+          edge.source === this.settingNodeId ||
+          edge.target === this.settingNodeId
+        ) {
+          return false;
         }
+        return true;
+      });
+    }
+    this.$emit("update:deleteNode", false);
+    alert("成功移除节点！");
+  }
+
+  /**
+   * 画布已存在节点检测
+   * @argument node - 节点状态码
+   */
+  codeExist(id: number) {
+    const index = this.nodes.findIndex(node => node.id === id);
+    if (index !== -1) {
+      alert("请勿增加重复节点！");
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * 增加节点
+   * @description 向SVG画布中新增节点
+   * @argument event mouse event
+   */
+  createNode(event: DragEvent) {
+    if (!this.createNodeLock) {
+      this.createNodeLock = true;
+      if (event.dataTransfer !== null) {
+        const jsonStr = event.dataTransfer.getData("item");
+        const jsonObj = JSON.parse(jsonStr);
+        const { id, title } = jsonObj;
+        this.createNodeLock = false;
+        if (this.codeExist(id)) {
+          return false;
+        }
+        const { offsetX: leftTopX, offsetY: leftTopY } = event;
+        const node = {
+          id: id,
+          title,
+          type: "real",
+          x: leftTopX - rectWidth / 2,
+          y: leftTopY - rectHeight / 2,
+          selected: false,
+          linkNode: {
+            left: {
+              x: leftTopX - rectWidth / 2,
+              y: leftTopY
+            },
+            right: {
+              x: leftTopX + rectWidth / 2,
+              y: leftTopY
+            }
+          }
+        };
+        this.nodes.push(node);
+        this.toggleIsDragging(false);
       }
-    };
-    this.nodes.push(node);
-    this.toggleIsDragging(false);
+    } else {
+      alert("正在生成节点，请稍等..");
+    }
   }
 
   /**
@@ -210,14 +299,15 @@ export default class Graph extends Vue {
   edgeData(edge: EdgeClass) {
     const { dotLink, dotEndLink } = edge;
     if (edge.source && edge.target) {
-      const bezier = 100;
-      const { linkNode: sourceLinkNode } = edge.source;
-      const { linkNode: targetLinkNode } = edge.target;
+      const { linkNode: sourceLinkNode, y: sourceNodeY }: any = this.nodes.find(
+        node => node.id === edge.source
+      );
+      const { linkNode: targetLinkNode }: any = this.nodes.find(
+        node => node.id === edge.target
+      );
 
       let startX = 0;
       let startY = 0;
-      let midX = 0;
-      let midY = 0;
       let endX = 0;
       let endY = 0;
 
@@ -237,14 +327,54 @@ export default class Graph extends Vue {
         endY = targetLinkNode.right.y;
       }
 
-      // midX = (startX + endX) / 2;
-      // midY = (startY + endX) / 2 - bezier;
+      const linkData = {
+        dotLink,
+        dotEndLink,
+        startX,
+        startY,
+        endX,
+        endY
+      };
 
-      // return `M ${startX},${startY} Q ${midX},${midY} ${endX},${endY}`;
-      return `M ${startX},${startY} L ${endX},${endY}`;
-    } else {
-      return false;
+      // 连接端点同侧
+      const sameLinkDotResult = handleTheSameLinkDot(linkData);
+
+      if (sameLinkDotResult !== "") {
+        return sameLinkDotResult;
+      }
+
+      // 连接端点不同侧且不为顺向连接直线的
+      const NotSameLinkDotAndNSLResult = handelNotSameLinkDotAndNotStraightLine(
+        linkData
+      );
+
+      if (NotSameLinkDotAndNSLResult !== "") {
+        return NotSameLinkDotAndNSLResult;
+      }
+
+      // 纵坐标最小连线误差直线拟合
+      const minY = Math.abs(startY - endY);
+      const rangeNum = 3;
+      if (minY < rangeNum) {
+        endY = startY;
+        this.nodes.forEach(i => {
+          if (i.id === edge.target) {
+            i.y = sourceNodeY;
+            return i;
+          }
+        });
+      }
+      // 正常情况连接
+      const { midX1, midY1, midX2, midY2 } = getMidXPath(
+        startX,
+        startY,
+        endX,
+        endY
+      );
+
+      return `M ${startX},${startY} L ${midX1},${midY1} L ${midX2},${midY2} L ${endX},${endY}`;
     }
+    return false;
   }
 
   nodeMousedown(node: NodeClass) {
@@ -264,7 +394,7 @@ export default class Graph extends Vue {
    * @argument position - 连线起点位置
    * @argument node - 起始节点
    */
-  linkNode(position: string, event: any) {
+  startLinkNode(position: string, event: any) {
     this.toggleToLink(true);
     this.dotLink = position;
   }
@@ -275,23 +405,24 @@ export default class Graph extends Vue {
    * @argument position - 连线终点位置
    * @argument node - 终止节点
    */
-  linkedNode(position: string, node: NodeClass) {
-    if (this.mousedownNode !== node) {
-      const source = this.mousedownNode;
-      const target = node;
+  endLinkedNode(position: string, node: NodeClass) {
+    if (this.mousedownNode !== null && this.mousedownNode !== node) {
+      const source = this.mousedownNode.id;
+      const target = node.id;
       let edgeIsExist = -1;
       if (this.edges.length > 0) {
-        edgeIsExist = this.edges.findIndex(function(i: EdgeClass): any {
-          return source === i.source && target === i.target;
-        });
+        edgeIsExist = this.edges.findIndex(
+          i => source === i.source && target === i.target
+        );
       }
       if (edgeIsExist === -1) {
+        const dotLink = this.dotLink;
         const edge = {
           id: edgeId++,
           source,
           target,
           selected: false,
-          dotLink: this.dotLink,
+          dotLink,
           dotEndLink: position
         };
         this.edges.push(edge);
@@ -300,68 +431,58 @@ export default class Graph extends Vue {
   }
 
   /**
-   * 动态计算路径拖拽数据
+   * 全局SVG鼠标事件监听
+   * @description 核心功能 - 处理连线轨迹 - 更新节点拖拽变化值
+   * @argument event - mouse event
    */
-  caclPathDragData(mousedownNode: NodeClass, event: any) {
-    const { x, y } = event;
+  svgMousemove(event: MouseEvent) {
+    let node = this.mousedownNode;
+    const { movementX, movementY } = event;
+    if (node !== null) {
+      // link node
+      if (this.isLinking) {
+        this.lineDragData = this.caclPathDragData(node, event);
+      }
+      // drag node 拖拽点值偏移量修正
+      if (this.nodeCanDrag) {
+        node.x += movementX;
+        node.y += movementY;
+        node.linkNode = {
+          left: {
+            x: node.x,
+            y: node.y + rectHeight / 2
+          },
+          right: {
+            x: node.x + rectWidth,
+            y: node.y + rectHeight / 2
+          }
+        };
+        this.mousedownNode = node;
+      }
+    }
+  }
+
+  /**
+   * 动态计算路径拖拽数据
+   * @argument mousedownNode - 当前 mousedown 状态节点
+   * @argument event - mouse event
+   */
+  caclPathDragData(mousedownNode: NodeClass, event: MouseEvent) {
+    const { offsetX: endX, offsetY: endY } = event;
     const { linkNode } = mousedownNode;
 
     let startX = 0;
     let startY = 0;
-    let endX = 0;
-    let endY = 0;
 
     if (this.dotLink === "left") {
       startX = linkNode.left.x;
       startY = linkNode.left.y;
-    } else {
+    } else if (this.dotLink === "right") {
       startX = linkNode.right.x;
       startY = linkNode.right.y;
     }
 
-    const arrowDx = 20;
-    const arrowDy = 10;
-
-    endX = x - arrowDx;
-    endY = y - rectHeight / 2 - arrowDy;
-
     return `M ${startX},${startY} L ${endX},${endY}`;
-  }
-
-  /**
-   * 全局SVG鼠标事件监听
-   * @description 核心功能 - 处理连线轨迹 - 更新节点拖拽变化值
-   */
-  svgMousemove(event: any) {
-    let node = this.mousedownNode;
-    const { x, y, movementX, movementY } = event;
-    if (node) {
-      if (this.isLinking) {
-        // link node
-        this.lineDragData = this.caclPathDragData(node, event);
-      }
-      if (this.nodeCanDrag) {
-        // drag node
-        let dx = Math.abs(x - node.x - svgDx);
-        let dy = Math.abs(y - node.y - svgDy);
-        // 拖拽点值偏移量修正
-        if (dx > svgDx) {
-          node.x = x - svgDx;
-        } else {
-          node.x = node.x + movementX;
-        }
-        if (dy > svgDy) {
-          node.y = y - svgDy;
-        } else {
-          node.y = node.y + movementY;
-        }
-        node.linkNode.left.x = node.x;
-        node.linkNode.left.y = node.y + rectHeight / 2;
-        node.linkNode.right.x = node.x + rectWidth;
-        node.linkNode.right.y = node.y + rectHeight / 2;
-        this.mousedownNode = node;
-      }
-    }
   }
 
   /**
@@ -385,40 +506,71 @@ export default class Graph extends Vue {
   }
 
   /**
-   * 鼠标右键菜单
-   */
-  rightMenu(event: any) {
-    // TODO: 预留鼠标右键菜单
-    event.preventDefault();
-    return false;
-  }
-
-  /**
    * 点击路径
    * @argument edge - 路径元数据
    */
   clickEdge(edge: EdgeClass) {
     this.unSelectedAll();
+    this.recoverySideBar();
     edge.selected = true;
     this.changSelectedEdge(edge);
+  }
+
+  /**
+   * 移动节点
+   * @argument node - 节点
+   */
+  dragNode(node: NodeClass) {
+    this.unSelectedAll();
+    this.recoverySideBar();
+    node.selected = true;
+    this.changSelectedNode(node);
+    this.mousedownNode = node;
+    if (this.graphState.toLink) {
+      this.isLinking = true;
+      this.nodeCanDrag = false;
+    }
+  }
+
+  recoverySideBar() {
+    this.settingNodeId = 0;
+    this.$emit("recovery-side-bar");
+  }
+
+  /**
+   * 鼠标右键菜单拓展
+   * @argument event - mouse event
+   * @argument node - 节点
+   */
+  rightMenu(event: MouseEvent, node: NodeClass) {
+    event.preventDefault();
+    this.unSelectedAll();
+    this.settingNodeId = node.id;
+    this.$emit("setting-node", { id: node.id, type: node.type });
   }
 
   /**
    * 解除节点选中状态
    */
   unSelectedNodes() {
-    this.nodes.map(function(node: NodeClass) {
-      node.selected = false;
-    });
+    this.nodes.forEach(
+      (node: NodeClass): NodeClass => {
+        node.selected = false;
+        return node;
+      }
+    );
   }
 
   /**
    * 解除节点连线选中状态
    */
   unSelectedEdges() {
-    this.edges.map(function(edge: EdgeClass) {
-      edge.selected = false;
-    });
+    this.edges.forEach(
+      (edge: EdgeClass): EdgeClass => {
+        edge.selected = false;
+        return edge;
+      }
+    );
   }
 
   /**
@@ -435,32 +587,36 @@ export default class Graph extends Vue {
 .graph-container {
     flex: 1;
     height: 100%;
-    border: 1px solid #DCDCDC;
-    overflow: hidden;
-    background: #FFFFFF;
-    box-shadow: 0 2px 4px 0 #B3C0D8;
-    margin-right: 7px;
+    border: 1px solid #dcdcdc;
+    background: #ffffff;
+    box-shadow: 0 2px 4px 0 #b3c0d8;
+    margin-right: 14px;
+    overflow: scroll;
 
     .svg-box {
-      background: #fff;
-      transition: background .2s ease-in-out;
+        background: #fff;
+        transition: background 0.2s ease-in-out;
     }
 
     .active {
-      background: #eee;
+        background: #eee;
     }
 
-    .zone {
+    svg.zone {
+        width: 5000px;
+        height: 818px;
+
         .graph {
             path.link {
                 fill: none;
                 stroke: #000;
                 stroke-width: 2px;
+                stroke-linejoin: round;
             }
 
             path.dragline {
-              stroke: #888;
-              stroke-dasharray: 8px;
+                stroke: #888;
+                stroke-dasharray: 8px;
             }
 
             path.selected {
@@ -474,7 +630,7 @@ export default class Graph extends Vue {
                 .node {
                     fill: transparent;
                     stroke-width: 2px;
-                    stroke: #000;
+                    stroke: #4a4a4a;
                     cursor: grab;
                     transition: all 0.2s ease-in-out;
                 }
@@ -483,31 +639,41 @@ export default class Graph extends Vue {
                     cursor: crosshair;
                 }
 
+                .setting {
+                    stroke: #4a90e2;
+                    stroke-width: 3px;
+                }
+
+                .virtual {
+                    stroke-dasharray: 2px;
+                }
+
                 .selected {
                     fill: #e2e2e2;
                 }
 
                 .link-dot {
                     r: 2px;
-                    fill: transparent;
                     stroke: #000;
                     stroke-width: 2px;
                     transition: all 0.2s ease-in-out;
 
                     &:hover {
-                        r: 10px;
+                        r: 12px;
                         stroke: red;
+                        fill: transparent;
                     }
                 }
 
                 .active-dot {
-                    r: 10px;
+                    r: 12px;
                     stroke: red;
+                    fill: transparent;
                 }
 
                 text {
                     font-size: 14px;
-                    color: #4a4a4a;
+                    fill: #4a4a4a;
                 }
             }
         }

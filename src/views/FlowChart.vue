@@ -2,10 +2,22 @@
   <div class="flow-chart-container">
     <div class="flow-chart-config">
       <Graph
-        :exportStatus.sync="exportStatus"
+        :importJsonData="importJsonData"
+        :nodeType="nodeType"
+        :saveStatus.sync="saveStatus"
+        :deleteNode.sync="deleteNode"
         @export-json="handleExportJSON"
+        @setting-node="handleNodeSetting"
+        @recovery-side-bar="handleRecoverySideBar"
       />
-      <SideBar />
+      <SideBar
+        :importJsonData="importJsonData"
+        :nodeType.sync="nodeType"
+        :saveStatus.sync="saveStatus"
+        :settingNodeId="settingNodeId"
+        @export-json="handleExportJSON"
+        @delete-node="handleDeleteNode"
+      />
     </div>
     <GraphShow :jsonData="jsonData" />
     <div class="control">
@@ -15,7 +27,7 @@
 </template>
 
 <script lang="ts">
-import { Component, Vue } from "vue-property-decorator";
+import { Component, Vue, Watch } from "vue-property-decorator";
 import SideBar from "@/components/SideBar.vue";
 import Graph from "@/components/Graph.vue";
 import GraphShow from "@/components/GraphShow.vue";
@@ -24,6 +36,7 @@ import { NodeClass, EdgeClass } from "@/components/Graph.vue";
 export interface SvgJsonClass {
   nodes: NodeClass[];
   edges: EdgeClass[];
+  nodesInfo: Array<object>;
 }
 
 @Component({
@@ -34,20 +47,67 @@ export interface SvgJsonClass {
   }
 })
 export default class FlowChart extends Vue {
-  private exportStatus: Boolean = false;
+  private saveStatus: boolean = false;
   private jsonData: SvgJsonClass = {
     nodes: [],
-    edges: []
+    edges: [],
+    nodesInfo: []
   };
+  private importJsonData: SvgJsonClass = {
+    nodes: [],
+    edges: [],
+    nodesInfo: []
+  };
+  private settingNodeId: number = 0;
+  private nodeType: string = "real"; // real || virtual
+  private deleteNode: boolean = false;
 
-  exportJSON() {
-    this.exportStatus = true;
+  @Watch("jsonData", { deep: true })
+  onJsonDataChanged(value: SvgJsonClass) {
+    const { nodes, edges, nodesInfo } = value;
+    if (
+      nodes.length > 0 &&
+      edges.length > 0
+      // && nodesInfo.length > 0
+    ) {
+      // ..
+    }
   }
 
-  handleExportJSON(data: SvgJsonClass) {
-    this.jsonData = data;
-    console.log(data);
-    alert("导出json数据成功！");
+  exportJSON() {
+    this.saveStatus = true;
+  }
+
+  handleExportJSON(data: object) {
+    this.jsonData = Object.assign(this.jsonData, data);
+  }
+
+  handleDeleteNode() {
+    if (this.deleteNode === false) {
+      this.deleteNode = true;
+    } else {
+      alert("当前删除状态出错，请重试");
+    }
+  }
+
+  handleNodeSetting(setting: any) {
+    const { id, type } = setting;
+    this.settingNodeId = id;
+    this.nodeType = type;
+  }
+
+  handleRecoverySideBar() {
+    this.settingNodeId = 0;
+    this.nodeType = "real";
+  }
+
+  recoverySave() {
+    this.saveStatus = false;
+    this.jsonData = {
+      nodes: [],
+      edges: [],
+      nodesInfo: []
+    };
   }
 }
 </script>
@@ -60,7 +120,7 @@ export default class FlowChart extends Vue {
     .flow-chart-config {
         display: flex;
         align-items: center;
-        height: 60vh;
+        height: 818px;
     }
 
     .control {

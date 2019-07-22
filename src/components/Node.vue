@@ -5,8 +5,8 @@
     @dragstart="dragstart($event, nodeItem)"
     @dragend="dragend"
   >
-    <div class="title text">{{ nodeItem.title }}</div>
     <div class="id text">{{ nodeItem.id }}</div>
+    <div class="title text">{{ nodeItem.title }}</div>
   </div>
 </template>
 
@@ -20,31 +20,35 @@ export default class Node extends Vue {
   @Prop() readonly nodeItem!: NodeItem;
   @Action("toggle_isDragging") toggleIsDragging: any;
 
-  dragstart(event: any, item: NodeItem) {
+  dragstart(event: DragEvent, item: NodeItem) {
     this.toggleIsDragging(true);
-    event.dataTransfer.setData("item", JSON.stringify(item));
+    if (event.dataTransfer !== null) {
+      event.dataTransfer.setData("item", JSON.stringify(item));
+    }
   }
 
-  dragend(event: any) {
+  dragend(event: DragEvent) {
     this.toggleIsDragging(false);
-    event.dataTransfer.clearData();
+    if (event.dataTransfer !== null) {
+      event.dataTransfer.clearData();
+    }
   }
 }
 </script>
 
 <style scoped lang="stylus">
 .node {
-    width: 40%;
-    height: 50px;
+    width: 141px;
+    height: 70px;
     display: flex;
     flex-flow: column;
     align-items: center;
     justify-content: center;
     cursor: grab;
-    margin: 10px;
+    margin: 2.5%;
     user-select: none;
     border-radius: 2px;
-    border: 2px solid #000;
+    border: 2px solid #4a4a4a;
     transition: all 0.2s ease-in-out;
 
     &:hover {
@@ -53,7 +57,7 @@ export default class Node extends Vue {
 
     .text {
         font-size: 14px;
-        color: #4A4A4A;
+        color: #4a4a4a;
     }
 }
 </style>
