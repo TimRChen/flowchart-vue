@@ -1,8 +1,11 @@
 # flowchart-vue
 基于Vue+Svg开发的流程图配置系统
-一步步来，点点滴滴.
 
-## 进度
+[点击查看项目演示](https://timrchen.github.io/flowchart-vue/dist/index.html)
+/
+[View project demo](https://timrchen.github.io/flowchart-vue/dist/index.html)
+
+## 进度 / Proccess
 
 - [ ] 必要开放文档
 - [x] 实现删除节点功能
