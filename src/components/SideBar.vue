@@ -76,11 +76,11 @@ export default class SideBar extends Vue {
   private list: NodeItem[] = [
     {
       id: 1,
-      title: "新建"
+      title: "开始"
     },
     {
       id: 2,
-      title: "完成"
+      title: "结束"
     },
     {
       id: 3,
@@ -93,9 +93,21 @@ export default class SideBar extends Vue {
     {
       id: 5,
       title: "审核失败"
+    },
+    {
+      id: 6,
+      title: "测试1"
+    },
+    {
+      id: 7,
+      title: "测试2"
+    },
+    {
+      id: 8,
+      title: "测试3"
     }
   ];
-  private nodesInfo: Array<any> = [];
+  private nodesInfo: any[] = [];
 
   private get showList() {
     return this.nav === "流程状态";
@@ -141,6 +153,10 @@ export default class SideBar extends Vue {
     this.nav = type;
   }
 
+  /**
+   * 处理类型改变时
+   * @argument {string} type - 类型
+   */
   handleTypeChanged(type: string) {
     this.nodesInfo.forEach(
       (node: any): any => {
@@ -152,6 +168,10 @@ export default class SideBar extends Vue {
     );
   }
 
+  /**
+   * 选择节点类型
+   * @argument {string} type - 类型
+   */
   chooseNodeType(type: string) {
     if (this.settingNodeId !== 0) {
       this.$emit("update:nodeType", type);
@@ -170,6 +190,8 @@ export default class SideBar extends Vue {
   }
   /**
    * 增加节点设置信息
+   * @argument {number} id - 节点ID
+   * @return {Promise<number>}
    */
   addNodeInfo(id: number): Promise<number> {
     return new Promise(resolve => {
@@ -193,6 +215,7 @@ export default class SideBar extends Vue {
 
   /**
    * 预览节点设置信息
+   * @argument {number} id - 节点ID
    */
   previewNodeSetting(id: number) {
     const { type } = this.nodesInfo.find(i => i.id === id);

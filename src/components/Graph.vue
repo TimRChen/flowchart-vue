@@ -3,6 +3,7 @@
     <div class="svg-box" @drop="createNode" @dragover.prevent>
       <svg
         class="zone"
+        xmlns="http://www.w3.org/2000/svg"
         :class="{ active: graphState.isDragging }"
         @mousemove="svgMousemove($event)"
         @mouseup="svgMouseUp"
@@ -29,7 +30,7 @@
             marker-end="url(#mark-arrow)"
           ></path>
 
-          <g>
+          <g class="edges-list">
             <path
               v-for="edge in edges"
               :key="edge.id"
@@ -40,13 +41,13 @@
             ></path>
           </g>
 
-          <g>
+          <g class="nodes-list">
             <g
               class="node-container"
               v-for="(node, index) in nodes"
               :key="index"
               :transform="'translate(' + node.x + ',' + node.y + ')'"
-              @mousedown="dragNode(node)"
+              @mousedown="dragSvgNode(node)"
               @contextmenu="rightMenu($event, node)"
             >
               <rect
@@ -109,14 +110,13 @@
 <script lang="ts">
 import { Component, Prop, Watch, Vue } from "vue-property-decorator";
 import { Getter, Action } from "vuex-class";
-import Node from "./Node.vue";
+import Node from "@/components/Node.vue";
 import {
+  getMidXPath,
   handleTheSameLinkDot,
-  handelNotSameLinkDotAndNotStraightLine,
-  getMidXPath
+  handelNotSameLinkDotAndNotStraightLine
 } from "@/utils/path.ts";
-
-let edgeId = 1;
+import { getRandomInt } from "@/utils/tools.ts";
 
 const rectWidth = 141;
 const rectHeight = 70;
@@ -192,6 +192,11 @@ export default class Graph extends Vue {
     this.edges = edges;
   }
 
+  /**
+   * 节点模块class
+   * @argument {NodeClass} node - 节点数据
+   * @return {Object}
+   */
   rectClass(node: NodeClass) {
     return {
       selected: node.selected,
@@ -238,9 +243,10 @@ export default class Graph extends Vue {
 
   /**
    * 画布已存在节点检测
-   * @argument node - 节点状态码
+   * @argument {number} id - 节点ID
+   * @return {boolean}
    */
-  codeExist(id: number) {
+  codeExist(id: number): boolean {
     const index = this.nodes.findIndex(node => node.id === id);
     if (index !== -1) {
       alert("请勿增加重复节点！");
@@ -252,7 +258,7 @@ export default class Graph extends Vue {
   /**
    * 增加节点
    * @description 向SVG画布中新增节点
-   * @argument event mouse event
+   * @argument {DragEvent} event - mouse event
    */
   createNode(event: DragEvent) {
     if (!this.createNodeLock) {
@@ -262,6 +268,7 @@ export default class Graph extends Vue {
         const jsonObj = JSON.parse(jsonStr);
         const { id, title } = jsonObj;
         this.createNodeLock = false;
+        // 检测画布中是否已存在即将新增节点
         if (this.codeExist(id)) {
           return false;
         }
@@ -288,13 +295,15 @@ export default class Graph extends Vue {
         this.toggleIsDragging(false);
       }
     } else {
-      alert("正在生成节点，请稍等..");
+      // 若存在异步增加节点需求可在此使用提示
+      // handling blocked asynchronous requests here
+      alert("生成节点中..(please wait or ignore this...)");
     }
   }
 
   /**
    * 连线数据
-   * @argument edge - 路径元数据
+   * @argument {EdgeClass} edge - 路径元数据
    */
   edgeData(edge: EdgeClass) {
     const { dotLink, dotEndLink } = edge;
@@ -364,7 +373,7 @@ export default class Graph extends Vue {
           }
         });
       }
-      // 正常情况连接
+      // 连接端点不同侧且为同一水平线连接（最常见的连接情况）
       const { midX1, midY1, midX2, midY2 } = getMidXPath(
         startX,
         startY,
@@ -377,33 +386,34 @@ export default class Graph extends Vue {
     return false;
   }
 
-  nodeMousedown(node: NodeClass) {
-    this.unSelectedAll();
-    node.selected = true;
-    this.changSelectedNode(node);
-    this.mousedownNode = node;
-    if (this.graphState.toLink) {
-      this.isLinking = true;
-      this.nodeCanDrag = false;
-    }
+  /**
+   * 画布已存在路径检测
+   * @argument {number} source - 源节点ID
+   * @argument {number} target - 目标节点ID
+   * @return {number}
+   */
+  edgeExist(source: number, target: number): number {
+    const edgeIsExist = this.edges.findIndex(
+      i => source === i.source && target === i.target
+    );
+    return edgeIsExist;
   }
 
   /**
    * 开始连接节点
    * @description 连线起始函数
-   * @argument position - 连线起点位置
-   * @argument node - 起始节点
+   * @argument {string} position - 连线起点位置
    */
-  startLinkNode(position: string, event: any) {
+  startLinkNode(position: string) {
     this.toggleToLink(true);
     this.dotLink = position;
   }
 
   /**
-   * 连接上节点
+   * 节点完成连接
    * @description 连线终止函数
-   * @argument position - 连线终点位置
-   * @argument node - 终止节点
+   * @argument {string} position - 连线终点位置
+   * @argument {NodeClass} node - 终止节点
    */
   endLinkedNode(position: string, node: NodeClass) {
     if (this.mousedownNode !== null && this.mousedownNode !== node) {
@@ -411,14 +421,13 @@ export default class Graph extends Vue {
       const target = node.id;
       let edgeIsExist = -1;
       if (this.edges.length > 0) {
-        edgeIsExist = this.edges.findIndex(
-          i => source === i.source && target === i.target
-        );
+        // 相同两个节点之间最大连接路径为1
+        edgeIsExist = this.edgeExist(source, target);
       }
       if (edgeIsExist === -1) {
         const dotLink = this.dotLink;
         const edge = {
-          id: edgeId++,
+          id: getRandomInt(),
           source,
           target,
           selected: false,
@@ -432,18 +441,18 @@ export default class Graph extends Vue {
 
   /**
    * 全局SVG鼠标事件监听
-   * @description 核心功能 - 处理连线轨迹 - 更新节点拖拽变化值
-   * @argument event - mouse event
+   * @description 核心方法 - 处理连线轨迹 - 更新节点拖拽变化值
+   * @argument {MouseEvent} event - mouse event
    */
   svgMousemove(event: MouseEvent) {
     let node = this.mousedownNode;
     const { movementX, movementY } = event;
     if (node !== null) {
-      // link node
+      // drag edge
       if (this.isLinking) {
         this.lineDragData = this.caclPathDragData(node, event);
       }
-      // drag node 拖拽点值偏移量修正
+      // drag node
       if (this.nodeCanDrag) {
         node.x += movementX;
         node.y += movementY;
@@ -464,10 +473,11 @@ export default class Graph extends Vue {
 
   /**
    * 动态计算路径拖拽数据
-   * @argument mousedownNode - 当前 mousedown 状态节点
-   * @argument event - mouse event
+   * @argument {NodeClass} mousedownNode - 当前 mousedown 状态节点
+   * @argument {MouseEvent} event - mouse event
+   * @return {string} path attr 'd' value
    */
-  caclPathDragData(mousedownNode: NodeClass, event: MouseEvent) {
+  caclPathDragData(mousedownNode: NodeClass, event: MouseEvent): string {
     const { offsetX: endX, offsetY: endY } = event;
     const { linkNode } = mousedownNode;
 
@@ -499,28 +509,10 @@ export default class Graph extends Vue {
   }
 
   /**
-   * 鼠标右键事件
+   * 在svg中拖拽节点
+   * @argument {NodeClass} node - 节点
    */
-  svgMouseRightDown() {
-    // this.toggleToLink(false);
-  }
-
-  /**
-   * 点击路径
-   * @argument edge - 路径元数据
-   */
-  clickEdge(edge: EdgeClass) {
-    this.unSelectedAll();
-    this.recoverySideBar();
-    edge.selected = true;
-    this.changSelectedEdge(edge);
-  }
-
-  /**
-   * 移动节点
-   * @argument node - 节点
-   */
-  dragNode(node: NodeClass) {
+  dragSvgNode(node: NodeClass) {
     this.unSelectedAll();
     this.recoverySideBar();
     node.selected = true;
@@ -532,6 +524,9 @@ export default class Graph extends Vue {
     }
   }
 
+  /**
+   * 恢复侧边栏状态
+   */
   recoverySideBar() {
     this.settingNodeId = 0;
     this.$emit("recovery-side-bar");
@@ -539,8 +534,8 @@ export default class Graph extends Vue {
 
   /**
    * 鼠标右键菜单拓展
-   * @argument event - mouse event
-   * @argument node - 节点
+   * @argument {MouseEvent} event - mouse event
+   * @argument {NodeClass} node - 节点
    */
   rightMenu(event: MouseEvent, node: NodeClass) {
     event.preventDefault();
@@ -579,6 +574,18 @@ export default class Graph extends Vue {
   unSelectedAll() {
     this.unSelectedNodes();
     this.unSelectedEdges();
+  }
+
+  /**
+   * 点击路径
+   * @description 暂无任何实际功能，需要可以自行增加删除路径功能或更多自定义效果
+   * @argument edge - 路径元数据
+   */
+  clickEdge(edge: EdgeClass) {
+    this.unSelectedAll();
+    this.recoverySideBar();
+    edge.selected = true;
+    this.changSelectedEdge(edge);
   }
 }
 </script>

@@ -20,6 +20,11 @@ export default class Node extends Vue {
   @Prop() readonly nodeItem!: NodeItem;
   @Action("toggle_isDragging") toggleIsDragging: any;
 
+  /**
+   * 开始拖拽节点
+   * @argument {DragEvent} event - 拖拽事件
+   * @argument {NodeItem} item - 节点数据
+   */
   dragstart(event: DragEvent, item: NodeItem) {
     this.toggleIsDragging(true);
     if (event.dataTransfer !== null) {
@@ -27,6 +32,10 @@ export default class Node extends Vue {
     }
   }
 
+  /**
+   * 拖拽节点事件终止
+   * @argument {DragEvent} event - 拖拽事件
+   */
   dragend(event: DragEvent) {
     this.toggleIsDragging(false);
     if (event.dataTransfer !== null) {
@@ -40,24 +49,24 @@ export default class Node extends Vue {
 .node {
     width: 141px;
     height: 70px;
+    margin: 2.5%;
+    cursor: grab;
     display: flex;
     flex-flow: column;
-    align-items: center;
-    justify-content: center;
-    cursor: grab;
-    margin: 2.5%;
     user-select: none;
+    align-items: center;
     border-radius: 2px;
+    justify-content: center;
     border: 2px solid #4a4a4a;
     transition: all 0.2s ease-in-out;
-
-    &:hover {
-        background-color: #e2e2e2;
-    }
 
     .text {
         font-size: 14px;
         color: #4a4a4a;
+    }
+
+    &:hover {
+        background-color: #e2e2e2;
     }
 }
 </style>

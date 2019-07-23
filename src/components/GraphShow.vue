@@ -217,7 +217,7 @@ export default class GraphShow extends Vue {
         });
       }
 
-      // 正常情况连接
+      // 连接端点不同侧且为同一水平线连接（最常见的连接情况）
       const { midX1, midY1, midX2, midY2 } = getMidXPath(
         startX,
         startY,
@@ -229,6 +229,11 @@ export default class GraphShow extends Vue {
     return false;
   }
 
+  /**
+   * 展示节点信息提示
+   * @argument {MouseEvent} event - mouse event
+   * @argument {number} nodeId - 节点ID
+   */
   showNodeInfoTip(event: MouseEvent, nodeId: number) {
     const { layerX, layerY } = event;
     this.tipX = layerX;
@@ -236,6 +241,9 @@ export default class GraphShow extends Vue {
     this.showTip = nodeId;
   }
 
+  /**
+   * 关闭节点信息提示
+   */
   closeNodeInfoTip() {
     if (this.showTip !== 0) {
       this.closeTip = true;

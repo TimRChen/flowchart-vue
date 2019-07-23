@@ -36,7 +36,7 @@ import { NodeClass, EdgeClass } from "@/components/Graph.vue";
 export interface SvgJsonClass {
   nodes: NodeClass[];
   edges: EdgeClass[];
-  nodesInfo: Array<object>;
+  nodesInfo: object[];
 }
 
 @Component({
@@ -48,16 +48,8 @@ export interface SvgJsonClass {
 })
 export default class FlowChart extends Vue {
   private saveStatus: boolean = false;
-  private jsonData: SvgJsonClass = {
-    nodes: [],
-    edges: [],
-    nodesInfo: []
-  };
-  private importJsonData: SvgJsonClass = {
-    nodes: [],
-    edges: [],
-    nodesInfo: []
-  };
+  private jsonData!: SvgJsonClass;
+  private importJsonData!: SvgJsonClass;
   private settingNodeId: number = 0;
   private nodeType: string = "real"; // real || virtual
   private deleteNode: boolean = false;
