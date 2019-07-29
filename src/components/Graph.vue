@@ -34,10 +34,15 @@
             <path
               v-for="edge in edges"
               :key="edge.id"
-              :class="['link', 'link-active', { selected: edge.selected }]"
+              :class="[
+                'link',
+                'link-line',
+                'link-active',
+                { selected: edge.selected }
+              ]"
               :d="edgeData(edge)"
+              @mousedown="clickPath($event, edge)"
               marker-end="url(#mark-arrow)"
-              @click="clickEdge(edge)"
             ></path>
           </g>
 
@@ -60,6 +65,28 @@
               ></rect>
 
               <circle
+                cx="70"
+                cy="0"
+                class="link-dot"
+                :class="{
+                  'active-dot': dotLink === 'top' && node === mousedownNode
+                }"
+                @mousedown="startLinkNode('top')"
+                @mouseup="endLinkedNode('top', node)"
+              />
+
+              <circle
+                cx="70"
+                cy="70"
+                class="link-dot"
+                :class="{
+                  'active-dot': dotLink === 'bottom' && node === mousedownNode
+                }"
+                @mousedown="startLinkNode('bottom')"
+                @mouseup="endLinkedNode('bottom', node)"
+              />
+
+              <circle
                 cx="0"
                 cy="35"
                 class="link-dot"
@@ -71,7 +98,7 @@
               />
 
               <circle
-                cx="141"
+                cx="140"
                 cy="35"
                 class="link-dot"
                 :class="{
@@ -80,6 +107,7 @@
                 @mousedown="startLinkNode('right')"
                 @mouseup="endLinkedNode('right', node)"
               />
+
               <svg :width="rectWidth" :height="rectHeight">
                 <text
                   x="50%"
@@ -103,6 +131,16 @@
           </g>
         </g>
       </svg>
+
+      <div
+        class="delete-tip"
+        :class="{ 'tip-close': closeTip }"
+        v-show="deleteTip !== 0"
+        :style="{ transform: 'translate(' + tipX + 'px,' + tipY + 'px)' }"
+        @click="deletePath"
+      >
+        删除路径
+      </div>
     </div>
   </div>
 </template>
@@ -112,13 +150,17 @@ import { Component, Prop, Watch, Vue } from "vue-property-decorator";
 import { Getter, Action } from "vuex-class";
 import Node from "@/components/Node.vue";
 import {
-  getMidXPath,
+  getFittedEndX,
   handleTheSameLinkDot,
-  handelNotSameLinkDotAndNotStraightLine
+  handleTheColSameLinkDot,
+  handleNotSameLinkDotAndAlongStraightLine,
+  handelNotSameLinkDotAndAlongColStraightLine,
+  getMidXPath,
+  getMidYPath
 } from "@/utils/path.ts";
 import { getRandomInt } from "@/utils/tools.ts";
 
-const rectWidth = 141;
+const rectWidth = 140;
 const rectHeight = 70;
 
 export interface NodeClass {
@@ -158,6 +200,11 @@ export default class Graph extends Vue {
   private dotLink: string = "";
   private settingNodeId: number = 0;
   private createNodeLock: boolean = false;
+  private deleteTip: number = 0;
+  private tipX: number = 0;
+  private tipY: number = 0;
+  private closeTip: boolean = false;
+  private timer: undefined | number = undefined;
 
   @Getter("graphState") graphState!: any;
   @Action("changSelectedNode") changSelectedNode!: Function;
@@ -272,22 +319,32 @@ export default class Graph extends Vue {
         if (this.codeExist(id)) {
           return false;
         }
-        const { offsetX: leftTopX, offsetY: leftTopY } = event;
+        const { offsetX: midX, offsetY: midY } = event;
+        const leftTopX = midX - rectWidth / 2;
+        const leftTopY = midY - rectHeight / 2;
         const node = {
           id: id,
           title,
           type: "real",
-          x: leftTopX - rectWidth / 2,
-          y: leftTopY - rectHeight / 2,
+          x: leftTopX,
+          y: leftTopY,
           selected: false,
           linkNode: {
-            left: {
-              x: leftTopX - rectWidth / 2,
+            top: {
+              x: midX,
               y: leftTopY
             },
+            bottom: {
+              x: midX,
+              y: midY + rectHeight / 2
+            },
+            left: {
+              x: leftTopX,
+              y: midY
+            },
             right: {
-              x: leftTopX + rectWidth / 2,
-              y: leftTopY
+              x: midX + rectWidth / 2,
+              y: midY
             }
           }
         };
@@ -299,6 +356,92 @@ export default class Graph extends Vue {
       // handling blocked asynchronous requests here
       alert("生成节点中..(please wait or ignore this...)");
     }
+  }
+
+  /**
+   * 连接点仅为左或右
+   */
+  linkDotIsLeftOrRight(linkData: any, edge: EdgeClass, sourceNodeY: number) {
+    let { startX, startY, endX, endY } = linkData;
+    // 连接端点同侧
+    const sameLinkDotResult = handleTheSameLinkDot(linkData);
+
+    if (sameLinkDotResult !== "") {
+      return sameLinkDotResult;
+    }
+
+    // 连接端点不同侧且节点之间处于同一纵向水平线的
+    const NotSameLinkDotAndACSLResult = handelNotSameLinkDotAndAlongColStraightLine(
+      linkData
+    );
+
+    if (NotSameLinkDotAndACSLResult !== "") {
+      return NotSameLinkDotAndACSLResult;
+    }
+
+    // 纵坐标最小连线误差直线拟合
+    const minY = Math.abs(startY - endY);
+    const rangeNum = 3;
+    if (minY < rangeNum) {
+      endY = startY;
+      this.nodes.forEach(i => {
+        if (i.id === edge.target) {
+          i.y = sourceNodeY;
+          return i;
+        }
+      });
+    }
+    // 连接端点不同侧且为水平线连接（最常见的连接情况）
+    const { midX1, midY1, midX2, midY2 } = getMidXPath(
+      startX,
+      startY,
+      endX,
+      endY
+    );
+
+    return `M ${startX},${startY} L ${midX1},${midY1} L ${midX2},${midY2} L ${endX},${endY}`;
+  }
+
+  /**
+   * 连接点仅为上或下
+   */
+  linkDotIsTopOrBottom(linkData: any) {
+    let { startX, startY, endX, endY } = linkData;
+    // 连接纵向端点同侧
+    const sameLinkDotResult = handleTheColSameLinkDot(linkData);
+
+    if (sameLinkDotResult !== "") {
+      return sameLinkDotResult;
+    }
+
+    // 连接端点为纵向不同侧且节点之间处于同一水平线的
+    const NotSameLinkDotAndASLResult = handleNotSameLinkDotAndAlongStraightLine(
+      linkData
+    );
+
+    if (NotSameLinkDotAndASLResult !== "") {
+      return NotSameLinkDotAndASLResult;
+    }
+
+    // 横坐标最小连线误差直线拟合
+    endX = getFittedEndX(startX, endX);
+
+    // 连接端点不同侧且为纵向水平线连接（最常见的连接情况）
+    const { midX1, midY1, midX2, midY2 } = getMidYPath(
+      startX,
+      startY,
+      endX,
+      endY
+    );
+    return `M ${startX},${startY} L ${midX1},${midY1} L ${midX2},${midY2} L ${endX},${endY}`;
+  }
+
+  /**
+   * 连接点为水平方向与纵向时
+   */
+  linkDotIsOthers(linkData: any) {
+    let { startX, startY, endX, endY } = linkData;
+    return `M ${startX},${startY} L ${endX},${endY}`;
   }
 
   /**
@@ -315,26 +458,10 @@ export default class Graph extends Vue {
         node => node.id === edge.target
       );
 
-      let startX = 0;
-      let startY = 0;
-      let endX = 0;
-      let endY = 0;
-
-      if (dotLink === "left") {
-        startX = sourceLinkNode.left.x;
-        startY = sourceLinkNode.left.y;
-      } else if (dotLink === "right") {
-        startX = sourceLinkNode.right.x;
-        startY = sourceLinkNode.right.y;
-      }
-
-      if (dotEndLink === "left") {
-        endX = targetLinkNode.left.x;
-        endY = targetLinkNode.left.y;
-      } else if (dotEndLink === "right") {
-        endX = targetLinkNode.right.x;
-        endY = targetLinkNode.right.y;
-      }
+      let startX = sourceLinkNode[dotLink].x;
+      let startY = sourceLinkNode[dotLink].y;
+      let endX = targetLinkNode[dotEndLink].x;
+      let endY = targetLinkNode[dotEndLink].y;
 
       const linkData = {
         dotLink,
@@ -352,36 +479,27 @@ export default class Graph extends Vue {
         return sameLinkDotResult;
       }
 
-      // 连接端点不同侧且不为顺向连接直线的
-      const NotSameLinkDotAndNSLResult = handelNotSameLinkDotAndNotStraightLine(
-        linkData
-      );
-
-      if (NotSameLinkDotAndNSLResult !== "") {
-        return NotSameLinkDotAndNSLResult;
+      // link dot is left or right.
+      if (
+        dotLink !== "top" &&
+        dotLink !== "bottom" &&
+        dotEndLink !== "top" &&
+        dotEndLink !== "bottom"
+      ) {
+        return this.linkDotIsLeftOrRight(linkData, edge, sourceNodeY);
       }
 
-      // 纵坐标最小连线误差直线拟合
-      const minY = Math.abs(startY - endY);
-      const rangeNum = 3;
-      if (minY < rangeNum) {
-        endY = startY;
-        this.nodes.forEach(i => {
-          if (i.id === edge.target) {
-            i.y = sourceNodeY;
-            return i;
-          }
-        });
+      // link dot is top or bottom.
+      if (
+        dotLink !== "left" &&
+        dotLink !== "right" &&
+        dotEndLink !== "left" &&
+        dotEndLink !== "right"
+      ) {
+        return this.linkDotIsTopOrBottom(linkData);
       }
-      // 连接端点不同侧且为同一水平线连接（最常见的连接情况）
-      const { midX1, midY1, midX2, midY2 } = getMidXPath(
-        startX,
-        startY,
-        endX,
-        endY
-      );
 
-      return `M ${startX},${startY} L ${midX1},${midY1} L ${midX2},${midY2} L ${endX},${endY}`;
+      return this.linkDotIsOthers(linkData);
     }
     return false;
   }
@@ -456,14 +574,24 @@ export default class Graph extends Vue {
       if (this.nodeCanDrag) {
         node.x += movementX;
         node.y += movementY;
+        const midX = node.x + rectWidth / 2;
+        const midY = node.y + rectHeight / 2;
         node.linkNode = {
+          top: {
+            x: midX,
+            y: node.y
+          },
+          bottom: {
+            x: midX,
+            y: node.y + rectHeight
+          },
           left: {
             x: node.x,
-            y: node.y + rectHeight / 2
+            y: midY
           },
           right: {
             x: node.x + rectWidth,
-            y: node.y + rectHeight / 2
+            y: midY
           }
         };
         this.mousedownNode = node;
@@ -480,18 +608,9 @@ export default class Graph extends Vue {
   caclPathDragData(mousedownNode: NodeClass, event: MouseEvent): string {
     const { offsetX: endX, offsetY: endY } = event;
     const { linkNode } = mousedownNode;
-
-    let startX = 0;
-    let startY = 0;
-
-    if (this.dotLink === "left") {
-      startX = linkNode.left.x;
-      startY = linkNode.left.y;
-    } else if (this.dotLink === "right") {
-      startX = linkNode.right.x;
-      startY = linkNode.right.y;
-    }
-
+    const dotLink = this.dotLink;
+    const startX = linkNode[dotLink].x;
+    const startY = linkNode[dotLink].y;
     return `M ${startX},${startY} L ${endX},${endY}`;
   }
 
@@ -500,6 +619,7 @@ export default class Graph extends Vue {
    */
   svgMouseUp() {
     this.unSelectedNodes();
+    this.closeDeleteTip();
     this.toggleToLink(false);
     this.mousedownNode = null;
     this.lineDragData = "";
@@ -545,6 +665,51 @@ export default class Graph extends Vue {
   }
 
   /**
+   * 点击路径
+   * @argument event - mouse event
+   * @argument edge - 路径元数据
+   */
+  clickPath(event: MouseEvent, edge: EdgeClass) {
+    this.unSelectedAll();
+    this.recoverySideBar();
+    edge.selected = true;
+    this.changSelectedEdge(edge);
+    const { layerX, layerY } = event;
+    this.tipX = layerX;
+    this.tipY = layerY;
+    this.deleteTip = edge.id;
+  }
+
+  /**
+   * 删除路径
+   */
+  deletePath() {
+    const deleteTip = this.deleteTip;
+    const index = this.edges.findIndex(edge => edge.id === deleteTip);
+    if (index !== -1) {
+      this.edges.splice(index, 1);
+      alert("连接路径已删除");
+    }
+    this.closeDeleteTip();
+  }
+
+  /**
+   * 关闭删除路径tip
+   */
+  closeDeleteTip() {
+    if (this.deleteTip !== 0) {
+      this.closeTip = true;
+      if (this.timer === undefined) {
+        this.timer = setTimeout(() => {
+          this.deleteTip = 0;
+          this.closeTip = false;
+          this.timer = undefined;
+        }, 188);
+      }
+    }
+  }
+
+  /**
    * 解除节点选中状态
    */
   unSelectedNodes() {
@@ -575,18 +740,6 @@ export default class Graph extends Vue {
     this.unSelectedNodes();
     this.unSelectedEdges();
   }
-
-  /**
-   * 点击路径
-   * @description 暂无任何实际功能，需要可以自行增加删除路径功能或更多自定义效果
-   * @argument edge - 路径元数据
-   */
-  clickEdge(edge: EdgeClass) {
-    this.unSelectedAll();
-    this.recoverySideBar();
-    edge.selected = true;
-    this.changSelectedEdge(edge);
-  }
 }
 </script>
 
@@ -599,6 +752,7 @@ export default class Graph extends Vue {
     box-shadow: 0 2px 4px 0 #b3c0d8;
     margin-right: 14px;
     overflow: scroll;
+    position: relative;
 
     .svg-box {
         background: #fff;
@@ -620,6 +774,14 @@ export default class Graph extends Vue {
                 stroke-width: 2px;
                 stroke-linejoin: round;
             }
+
+      path.link-line {
+        &:hover {
+          stroke: red;
+          stroke-width: 6px;
+          cursor: pointer;
+        }
+      }
 
             path.dragline {
                 stroke: #888;
@@ -685,5 +847,48 @@ export default class Graph extends Vue {
             }
         }
     }
+
+  div.delete-tip {
+    position: absolute;
+    top: 0;
+    width: 100px;
+    height: 30px;
+    font-size: 18px;
+    text-align: center;
+    line-height: 30px;
+    animation: fadeIn 0.2s ease-in-out;
+    box-shadow: 0 2px 4px 0 #b3c0d8;
+    transition: all 0.2s ease-in-out;
+    background-color: #fff;
+    user-select: none;
+    cursor: pointer;
+    &:hover {
+      color: #fff;
+      background-color: red;
+    }
+  }
+
+  div.tip-close {
+    animation: fadeOut 0.2s ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes fadeOut {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
 }
 </style>

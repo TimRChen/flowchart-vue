@@ -68,7 +68,7 @@
 
               <circle cx="0" cy="35" class="link-dot" />
 
-              <circle cx="141" cy="35" class="link-dot" />
+              <circle cx="140" cy="35" class="link-dot" />
 
               <svg :width="rectWidth" :height="rectHeight">
                 <text
@@ -106,11 +106,14 @@ import { NodeClass, EdgeClass } from "@/components/Graph.vue";
 import { SvgJsonClass } from "@/views/FlowChart.vue";
 import {
   handleTheSameLinkDot,
-  handelNotSameLinkDotAndNotStraightLine,
-  getMidXPath
+  handleTheColSameLinkDot,
+  handleNotSameLinkDotAndAlongStraightLine,
+  handelNotSameLinkDotAndAlongColStraightLine,
+  getMidXPath,
+  getMidYPath
 } from "@/utils/path.ts";
 
-const rectWidth = 141;
+const rectWidth = 140;
 const rectHeight = 70;
 let timer: number | null = null;
 
@@ -145,6 +148,96 @@ export default class GraphShow extends Vue {
   }
 
   /**
+   * 连接点仅为左或右
+   */
+  linkDotIsLeftOrRight(linkData: any, edge: EdgeClass, sourceNodeY: number) {
+    let { startX, startY, endX, endY } = linkData;
+    // 连接端点同侧
+    const sameLinkDotResult = handleTheSameLinkDot(linkData);
+
+    if (sameLinkDotResult !== "") {
+      return sameLinkDotResult;
+    }
+
+    // 连接端点不同侧且节点之间处于同一纵向水平线的
+    const NotSameLinkDotAndACSLResult = handelNotSameLinkDotAndAlongColStraightLine(
+      linkData
+    );
+
+    if (NotSameLinkDotAndACSLResult !== "") {
+      return NotSameLinkDotAndACSLResult;
+    }
+
+    // 纵坐标最小连线误差直线拟合
+    const minY = Math.abs(startY - endY);
+    const rangeNum = 3;
+    if (minY < rangeNum) {
+      endY = startY;
+      this.nodes.forEach(i => {
+        if (i.id === edge.target) {
+          i.y = sourceNodeY;
+          return i;
+        }
+      });
+    }
+    // 连接端点不同侧且为水平线连接（最常见的连接情况）
+    const { midX1, midY1, midX2, midY2 } = getMidXPath(
+      startX,
+      startY,
+      endX,
+      endY
+    );
+
+    return `M ${startX},${startY} L ${midX1},${midY1} L ${midX2},${midY2} L ${endX},${endY}`;
+  }
+
+  /**
+   * 连接点仅为上或下
+   */
+  linkDotIsTopOrBottom(linkData: any) {
+    let { startX, startY, endX, endY } = linkData;
+    // 连接纵向端点同侧
+    const sameLinkDotResult = handleTheColSameLinkDot(linkData);
+
+    if (sameLinkDotResult !== "") {
+      return sameLinkDotResult;
+    }
+
+    // 连接端点为纵向不同侧且节点之间处于同一水平线的
+    const NotSameLinkDotAndASLResult = handleNotSameLinkDotAndAlongStraightLine(
+      linkData
+    );
+
+    if (NotSameLinkDotAndASLResult !== "") {
+      return NotSameLinkDotAndASLResult;
+    }
+
+    // 横坐标最小连线误差直线拟合
+    const minX = Math.abs(startX - endX);
+    const rangeNum = 3;
+    if (minX < rangeNum) {
+      endX = startX;
+    }
+
+    // 连接端点不同侧且为纵向水平线连接（最常见的连接情况）
+    const { midX1, midY1, midX2, midY2 } = getMidYPath(
+      startX,
+      startY,
+      endX,
+      endY
+    );
+    return `M ${startX},${startY} L ${midX1},${midY1} L ${midX2},${midY2} L ${endX},${endY}`;
+  }
+
+  /**
+   * 连接点为水平方向与纵向时
+   */
+  linkDotIsOthers(linkData: any) {
+    let { startX, startY, endX, endY } = linkData;
+    return `M ${startX},${startY} L ${endX},${endY}`;
+  }
+
+  /**
    * 连线数据
    * @argument edge - 路径元数据
    */
@@ -158,26 +251,10 @@ export default class GraphShow extends Vue {
         i => i.id === edge.target
       );
 
-      let startX = 0;
-      let startY = 0;
-      let endX = 0;
-      let endY = 0;
-
-      if (dotLink === "left") {
-        startX = sourceLinkNode.left.x;
-        startY = sourceLinkNode.left.y;
-      } else if (dotLink === "right") {
-        startX = sourceLinkNode.right.x;
-        startY = sourceLinkNode.right.y;
-      }
-
-      if (dotEndLink === "left") {
-        endX = targetLinkNode.left.x;
-        endY = targetLinkNode.left.y;
-      } else if (dotEndLink === "right") {
-        endX = targetLinkNode.right.x;
-        endY = targetLinkNode.right.y;
-      }
+      let startX = sourceLinkNode[dotLink].x;
+      let startY = sourceLinkNode[dotLink].y;
+      let endX = targetLinkNode[dotEndLink].x;
+      let endY = targetLinkNode[dotEndLink].y;
 
       const linkData = {
         dotLink,
@@ -188,43 +265,27 @@ export default class GraphShow extends Vue {
         endY
       };
 
-      // 连接端点同侧
-      const sameLinkDotResult = handleTheSameLinkDot(linkData);
-
-      if (sameLinkDotResult !== "") {
-        return sameLinkDotResult;
+      // link dot is left or right.
+      if (
+        dotLink !== "top" &&
+        dotLink !== "bottom" &&
+        dotEndLink !== "top" &&
+        dotEndLink !== "bottom"
+      ) {
+        return this.linkDotIsLeftOrRight(linkData, edge, sourceNodeY);
       }
 
-      // 连接端点不同侧且不为顺向连接直线的
-      const NotSameLinkDotAndNSLResult = handelNotSameLinkDotAndNotStraightLine(
-        linkData
-      );
-
-      if (NotSameLinkDotAndNSLResult !== "") {
-        return NotSameLinkDotAndNSLResult;
+      // link dot is top or bottom.
+      if (
+        dotLink !== "left" &&
+        dotLink !== "right" &&
+        dotEndLink !== "left" &&
+        dotEndLink !== "right"
+      ) {
+        return this.linkDotIsTopOrBottom(linkData);
       }
 
-      // 纵坐标最小连线误差直线拟合
-      const minY = Math.abs(startY - endY);
-      const rangeNum = 3;
-      if (minY < rangeNum) {
-        endY = startY;
-        this.nodes.forEach(i => {
-          if (i.id === edge.target) {
-            i.y = sourceNodeY;
-            return i;
-          }
-        });
-      }
-
-      // 连接端点不同侧且为同一水平线连接（最常见的连接情况）
-      const { midX1, midY1, midX2, midY2 } = getMidXPath(
-        startX,
-        startY,
-        endX,
-        endY
-      );
-      return `M ${startX},${startY} L ${midX1},${midY1} L ${midX2},${midY2} L ${endX},${endY}`;
+      return this.linkDotIsOthers(linkData);
     }
     return false;
   }

@@ -1,5 +1,34 @@
-const rectWidth = 141;
+const rectWidth = 140;
 const rectHeight = 70;
+
+/**
+ * 横坐标最小连线误差直线拟合
+ * @argument {String} startX 起始点XAxis
+ * @argument {String} endY 终点YAxis
+ */
+export function getFittedEndX(startX: number, endX: number) {
+  const minX = Math.abs(startX - endX);
+  const rangeNum = 3;
+  if (minX < rangeNum) {
+    endX = startX;
+  }
+  return endX;
+}
+
+/**
+ * 纵坐标最小连线误差直线拟合
+ * @argument {String} startY
+ * @argument {String} endY
+ */
+export function getFittedEndY(startY: number, endY: number) {
+  const minY = Math.abs(startY - endY);
+  const rangeNum = 3;
+  if (minY < rangeNum) {
+    endY = startY;
+  }
+  return endY;
+}
+
 
 /**
  * 获取顺向异端相连时中间横坐标路径
@@ -33,7 +62,7 @@ export function getMidXPath(
  * @argument {String} endX 终点XAxis
  * @argument {String} endY 终点YAxis
  */
-function getMidYPath(
+export function getMidYPath(
   startX: number,
   startY: number,
   endX: number,
@@ -48,6 +77,68 @@ function getMidYPath(
     midY1,
     midX2,
     midY2
+  };
+}
+
+/**
+ * 获取上端连上端时中间路径坐标
+ * @argument {String} startX 起始点XAxis
+ * @argument {String} startY 起始点YAxis
+ * @argument {String} endX 终点XAxis
+ * @argument {String} endY 终点YAxis
+ */
+function getTTMidPath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number
+) {
+  let dY = Math.abs(startY - endY) * 2;
+  if (dY === 0 || dY < rectHeight * 2) {
+    dY = 44;
+  }
+  if (dY > rectHeight * 2) {
+    dY = 44;
+  }
+  const minY = startY > endY ? endY : startY;
+  const midY = minY - dY;
+  const midX1 = startX;
+  const midX2 = endX;
+  return {
+    midY,
+    midX1,
+    midX2
+  };
+}
+
+/**
+ * 获取上端连上端时中间路径坐标
+ * @argument {String} startX 起始点XAxis
+ * @argument {String} startY 起始点YAxis
+ * @argument {String} endX 终点XAxis
+ * @argument {String} endY 终点YAxis
+ */
+function getBBMidPath(
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number
+) {
+  let dY = Math.abs(startY - endY) * 2;
+  if (dY === 0 || dY < rectHeight * 2) {
+    dY = 44;
+  }
+  if (dY > rectHeight * 2) {
+    dY = 44;
+  }
+  const maxY = startY > endY ? startY : endY;
+  const midY = maxY + dY;
+  const midX1 = startX;
+  const midX2 = endX;
+  return {
+    midY,
+    midX1,
+    midX2
   };
 }
 
@@ -114,56 +205,21 @@ function getRRMidPath(
 }
 
 /**
- * 获取右端向左端且非直线连接线段（输出四个点坐标）
- * @argument {String} startX 起始点XAxis
- * @argument {String} startY 起始点YAxis
- * @argument {String} endX 终点XAxis
- * @argument {String} endY 终点YAxis
+ * 同侧端点连接： T-T || B-B
  */
-function getRToLNotStraightLinePath(
-  startX: number,
-  startY: number,
-  endX: number,
-  endY: number
-) {
-  const dotX1 = startX + rectWidth / 4;
-  const dotY2 = (startY + endY) / 2;
-  const dotX3 = endX - rectWidth / 4;
-  return {
-    dotX1,
-    dotY1: startY,
-    dotX2: dotX1,
-    dotY2,
-    dotX3: dotX3,
-    dotY3: dotY2,
-    dotX4: dotX3,
-    dotY4: endY
-  };
-}
-
-/**
- * 获取左端向右端且非直线连接线段（输出四个点坐标）
- * @argument linkData - 连线数据
- */
-function getLToRNotStraightLine(
-  startX: number,
-  startY: number,
-  endX: number,
-  endY: number
-) {
-  const dotX1 = startX - rectWidth / 4;
-  const dotY2 = (startY + endY) / 2;
-  const dotX3 = endX + rectWidth / 4;
-  return {
-    dotX1,
-    dotY1: startY,
-    dotX2: dotX1,
-    dotY2,
-    dotX3,
-    dotY3: dotY2,
-    dotX4: dotX3,
-    dotY4: endY
-  };
+export function handleTheColSameLinkDot(linkData: any) {
+  const { dotLink, dotEndLink, startX, startY, endX, endY } = linkData;
+  let pathData: any = {};
+  if (dotLink === "top" && dotEndLink === "top") {
+    pathData = getTTMidPath(startX, startY, endX, endY);
+  } else if (dotLink === "bottom" && dotEndLink === "bottom") {
+    pathData = getBBMidPath(startX, startY, endX, endY);
+  }
+  if (Object.keys(pathData).length > 0) {
+    const { midY, midX1, midX2 } = pathData;
+    return `M ${startX},${startY} L ${midX1},${midY} L ${midX2},${midY} L ${endX},${endY}`;
+  }
+  return "";
 }
 
 /**
@@ -171,38 +227,160 @@ function getLToRNotStraightLine(
  */
 export function handleTheSameLinkDot(linkData: any) {
   const { dotLink, dotEndLink, startX, startY, endX, endY } = linkData;
+  let pathData: any = {};
   if (dotLink === "left" && dotEndLink === "left") {
-    const { midX, midY1, midY2 } = getLLMidPath(startX, startY, endX, endY);
-    return `M ${startX},${startY} L ${midX},${midY1} L ${midX},${midY2} L ${endX},${endY}`;
+    pathData = getLLMidPath(startX, startY, endX, endY);
   } else if (dotLink === "right" && dotEndLink === "right") {
-    const { midX, midY1, midY2 } = getRRMidPath(startX, startY, endX, endY);
+    pathData = getRRMidPath(startX, startY, endX, endY);
+  }
+  if (Object.keys(pathData).length > 0) {
+    const { midX, midY1, midY2 } = pathData;
     return `M ${startX},${startY} L ${midX},${midY1} L ${midX},${midY2} L ${endX},${endY}`;
   }
   return "";
 }
 
 /**
- * 连接端点不同侧且不为顺向连接直线的
+ * 连接端点为纵向不同侧且节点之间处于同一水平线的
  * @argument linkData - 连线数据
  */
-export function handelNotSameLinkDotAndNotStraightLine(linkData: any) {
+export function handleNotSameLinkDotAndAlongStraightLine(linkData: any) {
+  const { dotLink, dotEndLink, startX, startY, endX, endY } = linkData;
+  if (dotLink === "bottom" && dotEndLink === "top") {
+    if (endY < startY) {
+      if (startX + rectWidth < endX) {
+        const newStartX = startX + rectWidth / 2;
+        const newStartY = startY - rectHeight / 2;
+        const newEndX = endX - rectWidth / 2;
+        let newEndY = endY + rectHeight / 2;
+
+        // 纵坐标最小连线误差直线拟合
+        newEndY = getFittedEndY(newStartY, newEndY);
+
+        const { midX1, midY1, midX2, midY2 } = getMidXPath(
+          newStartX,
+          newStartY,
+          newEndX,
+          newEndY
+        );
+        return `M ${newStartX},${newStartY} L ${midX1},${midY1} L ${midX2},${midY2} L ${newEndX},${newEndY}`;
+      } else if (startX - rectWidth > endX) {
+        const newStartX = startX - rectWidth / 2;
+        const newStartY = startY - rectHeight / 2;
+        const newEndX = endX + rectWidth / 2;
+        let newEndY = endY + rectHeight / 2;
+
+        // 纵坐标最小连线误差直线拟合
+        newEndY = getFittedEndY(newStartY, newEndY);
+
+        const { midX1, midY1, midX2, midY2 } = getMidXPath(
+          newStartX,
+          newStartY,
+          newEndX,
+          newEndY
+        );
+        return `M ${newStartX},${newStartY} L ${midX1},${midY1} L ${midX2},${midY2} L ${newEndX},${newEndY}`;
+      } else {
+        const newStartX = startX;
+        const newStartY = startY - rectHeight;
+        let newEndX = endX;
+        const newEndY = endY + rectHeight;
+
+        // 横坐标最小连线误差直线拟合
+        newEndX = getFittedEndX(newStartX, newEndX);
+
+        const { midX1, midY1, midX2, midY2 } = getMidYPath(
+          newStartX,
+          newStartY,
+          newEndX,
+          newEndY
+        );
+        return `M ${newStartX},${newStartY} L ${midX1},${midY1} L ${midX2},${midY2} L ${newEndX},${newEndY}`;
+      }
+    }
+  } else if (dotLink === "top" && dotEndLink === "bottom") {
+    if (startY < endY) {
+      if (startX + rectWidth < endX) {
+        const newStartX = startX + rectWidth / 2;
+        const newStartY = startY + rectHeight / 2;
+        const newEndX = endX - rectWidth / 2;
+        let newEndY = endY - rectHeight / 2;
+
+        // 纵坐标最小连线误差直线拟合
+        newEndY = getFittedEndY(newStartY, newEndY);
+
+        const { midX1, midY1, midX2, midY2 } = getMidXPath(
+          newStartX,
+          newStartY,
+          newEndX,
+          newEndY
+        );
+        return `M ${newStartX},${newStartY} L ${midX1},${midY1} L ${midX2},${midY2} L ${newEndX},${newEndY}`;
+      } else if (startX - rectWidth > endX) {
+        const newStartX = startX - rectWidth / 2;
+        const newStartY = startY + rectHeight / 2;
+        const newEndX = endX + rectWidth / 2;
+        let newEndY = endY - rectHeight / 2;
+
+        // 纵坐标最小连线误差直线拟合
+        newEndY = getFittedEndY(newStartY, newEndY);
+
+        const { midX1, midY1, midX2, midY2 } = getMidXPath(
+          newStartX,
+          newStartY,
+          newEndX,
+          newEndY
+        );
+        return `M ${newStartX},${newStartY} L ${midX1},${midY1} L ${midX2},${midY2} L ${newEndX},${newEndY}`;
+      } else {
+        const newStartX = startX;
+        const newStartY = startY + rectHeight;
+        let newEndX = endX;
+        const newEndY = endY - rectHeight;
+
+        // 横坐标最小连线误差直线拟合
+        newEndX = getFittedEndX(newStartX, newEndX);
+
+        const { midX1, midY1, midX2, midY2 } = getMidYPath(
+          newStartX,
+          newStartY,
+          newEndX,
+          newEndY
+        );
+        return `M ${newStartX},${newStartY} L ${midX1},${midY1} L ${midX2},${midY2} L ${newEndX},${newEndY}`;
+      }
+    }
+  }
+  return "";
+}
+
+
+
+/**
+ * 连接端点不同侧且节点之间处于同一纵向水平线的
+ * @argument linkData - 连线数据
+ */
+export function handelNotSameLinkDotAndAlongColStraightLine(linkData: any) {
   const { dotLink, dotEndLink, startX, startY, endX, endY } = linkData;
   if (dotLink === "left" && dotEndLink === "right") {
     if (startX < endX) {
       if (startX + rectWidth * 2 < endX) {
         // 起始端口距离终止端口两倍距离时连线(非顺向)
-        const {
-          dotX1,
-          dotY1,
-          dotX2,
-          dotY2,
-          dotX3,
-          dotY3,
-          dotX4,
-          dotY4
-        } = getLToRNotStraightLine(startX, startY, endX, endY);
+        let newStartX = startX + rectWidth;
+        let newStartY = startY;
+        let newEndX = endX - rectWidth;
+        let newEndY = endY;
 
-        return `M ${startX},${startY} L ${dotX1},${dotY1} L ${dotX2},${dotY2} L ${dotX3},${dotY3} L ${dotX4},${dotY4} L ${endX},${endY}`;
+        // 纵坐标最小连线误差直线拟合
+        newEndY = getFittedEndY(newStartY, newEndY);
+
+        const { midX1, midY1, midX2, midY2 } = getMidXPath(
+          newStartX,
+          newStartY,
+          newEndX,
+          newEndY
+        );
+        return `M ${newStartX},${newStartY} L ${midX1},${midY1} L ${midX2},${midY2} L ${newEndX},${newEndY}`;
       } else if (startX + rectWidth * 2 >= endX) {
         // 两者正对(包括偏差)时连线
         let newStartX = startX + rectWidth / 2;
@@ -217,11 +395,7 @@ export function handelNotSameLinkDotAndNotStraightLine(linkData: any) {
         }
 
         // 横坐标最小连线误差直线拟合
-        const minX = Math.abs(newStartX - newEndX);
-        const rangeNum = 3;
-        if (minX < rangeNum) {
-          newEndX = newStartX;
-        }
+        newEndX = getFittedEndX(newStartX, newEndX);
 
         const { midX1, midY1, midX2, midY2 } = getMidYPath(
           newStartX,
@@ -236,18 +410,21 @@ export function handelNotSameLinkDotAndNotStraightLine(linkData: any) {
     if (startX > endX) {
       if (endX + rectWidth * 2 < startX) {
         // 起始端口距离终止端口两倍距离时连线(非顺向)
-        const {
-          dotX1,
-          dotY1,
-          dotX2,
-          dotY2,
-          dotX3,
-          dotY3,
-          dotX4,
-          dotY4
-        } = getRToLNotStraightLinePath(startX, startY, endX, endY);
+        let newStartX = startX - rectWidth;
+        let newStartY = startY;
+        let newEndX = endX + rectWidth;
+        let newEndY = endY;
 
-        return `M ${startX},${startY} L ${dotX1},${dotY1} L ${dotX2},${dotY2} L ${dotX3},${dotY3} L ${dotX4},${dotY4} L ${endX},${endY}`;
+        // 纵坐标最小连线误差直线拟合
+        newEndY = getFittedEndY(newStartY, newEndY);
+
+        const { midX1, midY1, midX2, midY2 } = getMidXPath(
+          newStartX,
+          newStartY,
+          newEndX,
+          newEndY
+        );
+        return `M ${newStartX},${newStartY} L ${midX1},${midY1} L ${midX2},${midY2} L ${newEndX},${newEndY}`;
       } else if (endX + rectWidth * 2 >= startX) {
         // 两者正对(包括偏差)时连线
         let newStartX = startX - rectWidth / 2;
@@ -262,11 +439,7 @@ export function handelNotSameLinkDotAndNotStraightLine(linkData: any) {
         }
 
         // 横坐标最小连线误差直线拟合
-        const minX = Math.abs(newStartX - newEndX);
-        const rangeNum = 3;
-        if (minX < rangeNum) {
-          newEndX = newStartX;
-        }
+        newEndX = getFittedEndX(newStartX, newEndX);
 
         const { midX1, midY1, midX2, midY2 } = getMidYPath(
           newStartX,

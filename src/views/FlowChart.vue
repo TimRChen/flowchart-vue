@@ -48,8 +48,16 @@ export interface SvgJsonClass {
 })
 export default class FlowChart extends Vue {
   private saveStatus: boolean = false;
-  private jsonData!: SvgJsonClass;
-  private importJsonData!: SvgJsonClass;
+  private jsonData: SvgJsonClass = {
+    nodes: [],
+    edges: [],
+    nodesInfo: []
+  };
+  private importJsonData: SvgJsonClass = {
+    nodes: [],
+    edges: [],
+    nodesInfo: []
+  };
   private settingNodeId: number = 0;
   private nodeType: string = "real"; // real || virtual
   private deleteNode: boolean = false;
