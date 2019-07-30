@@ -29,7 +29,6 @@ export function getFittedEndY(startY: number, endY: number) {
   return endY;
 }
 
-
 /**
  * 获取顺向异端相连时中间横坐标路径
  * @argument {String} startX 起始点XAxis
@@ -353,8 +352,6 @@ export function handleNotSameLinkDotAndAlongStraightLine(linkData: any) {
   }
   return "";
 }
-
-
 
 /**
  * 连接端点不同侧且节点之间处于同一纵向水平线的

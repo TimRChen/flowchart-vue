@@ -775,13 +775,13 @@ export default class Graph extends Vue {
                 stroke-linejoin: round;
             }
 
-      path.link-line {
-        &:hover {
-          stroke: red;
-          stroke-width: 6px;
-          cursor: pointer;
-        }
-      }
+            path.link-line {
+              &:hover {
+                stroke: red;
+                stroke-width: 6px;
+                cursor: pointer;
+              }
+            }
 
             path.dragline {
                 stroke: #888;
